@@ -30,31 +30,31 @@ class Board:
     """
 
     def __init__(self):
-        self.grid: List[List[Optional[Piece]]] = [[None for _ in range(1, 9)] for _ in range(1, 9)]
+        self.grid: List[List[Optional[Piece]]] = [[None for _ in range(8)] for _ in range(8)]
         self.moveHistory = []
         self.setup_board()
 
     def setup_board(self):
         """Initializes the chess board with pieces in their starting positions."""
-        for i in range(1, 9):
-            self.grid[i][2] = Pawn(PieceColor.WHITE, (i, 2))
-            self.grid[i][7] = Pawn(PieceColor.BLACK, (i, 7))
-        self.grid[1][1] = Rook(PieceColor.WHITE, (1, 1))
-        self.grid[8][1] = Rook(PieceColor.WHITE, (8, 1))
-        self.grid[1][8] = Rook(PieceColor.BLACK, (1, 8))
-        self.grid[8][8] = Rook(PieceColor.BLACK, (8, 8))
-        self.grid[2][1] = Knight(PieceColor.WHITE, (2, 1))
-        self.grid[7][1] = Knight(PieceColor.WHITE, (7, 1))
-        self.grid[2][8] = Knight(PieceColor.BLACK, (2, 8))
-        self.grid[7][8] = Knight(PieceColor.BLACK, (7, 8))
-        self.grid[3][1] = Bishop(PieceColor.WHITE, (3, 1))
-        self.grid[6][1] = Bishop(PieceColor.WHITE, (6, 1))
-        self.grid[3][8] = Bishop(PieceColor.BLACK, (3, 8))
-        self.grid[6][8] = Bishop(PieceColor.BLACK, (6, 8))
-        self.grid[4][1] = Queen(PieceColor.WHITE, (4, 1))
-        self.grid[4][8] = Queen(PieceColor.BLACK, (4, 8))
-        self.grid[5][8] = King(PieceColor.BLACK, (5, 8))
-        self.grid[5][1] = King(PieceColor.WHITE, (5, 1))
+        for i in range(8):
+            self.grid[i][1] = Pawn(PieceColor.WHITE, (i, 1))
+            self.grid[i][6] = Pawn(PieceColor.BLACK, (i, 6))
+        self.grid[0][0] = Rook(PieceColor.WHITE, (0, 0))
+        self.grid[7][0] = Rook(PieceColor.WHITE, (7, 0))
+        self.grid[0][7] = Rook(PieceColor.BLACK, (0, 7))
+        self.grid[7][7] = Rook(PieceColor.BLACK, (7, 7))
+        self.grid[1][0] = Knight(PieceColor.WHITE, (1, 0))
+        self.grid[6][0] = Knight(PieceColor.WHITE, (6, 0))
+        self.grid[1][7] = Knight(PieceColor.BLACK, (1, 7))
+        self.grid[6][7] = Knight(PieceColor.BLACK, (6, 7))
+        self.grid[2][0] = Bishop(PieceColor.WHITE, (2, 0))
+        self.grid[5][0] = Bishop(PieceColor.WHITE, (5, 0))
+        self.grid[2][7] = Bishop(PieceColor.BLACK, (2, 7))
+        self.grid[5][7] = Bishop(PieceColor.BLACK, (5, 7))
+        self.grid[3][0] = Queen(PieceColor.WHITE, (3, 0))
+        self.grid[3][7] = Queen(PieceColor.BLACK, (3, 7))
+        self.grid[4][7] = King(PieceColor.BLACK, (4, 7))
+        self.grid[4][0] = King(PieceColor.WHITE, (4, 0))
 
     def move_piece(self, current_pos: Tuple[int, int], new_pos: Tuple[int, int]) -> bool:
         """Move a piece from current position to new position."""
@@ -63,89 +63,89 @@ class Board:
         if not piece or not piece.is_valid_move(current_pos, new_pos, self.grid):
             return False
         in_check_color: Optional[PieceColor] = self.is_check()  # check if any king is in check
-        if in_check_color and piece.getColor() == in_check_color:  # if piece's king is in check
+        if in_check_color and piece.get_color() == in_check_color:  # if piece's king is in check
             # Try the move
             captured_piece: Optional[Piece] = self.grid[new_pos[0]][new_pos[1]]  # store potentially captured piece
 
             # Make the move temporarily
             self.grid[new_pos[0]][new_pos[1]] = piece  # place piece in new position
             self.grid[current_pos[0]][current_pos[1]] = None  # remove piece from current position
-            piece.setPosition(new_pos)  # update piece's internal position
+            piece.set_position(new_pos)  # update piece's internal position
 
             still_in_check: bool = self.is_check() == in_check_color  # Check if still in check after the move
 
             # Undo the move
             self.grid[current_pos[0]][current_pos[1]] = piece  # restore piece to original position
             self.grid[new_pos[0]][new_pos[1]] = captured_piece  # restore captured piece if any
-            piece.setPosition(current_pos)  # reset piece's internal position
+            piece.set_position(current_pos)  # reset piece's internal position
 
             if still_in_check:
                 return False  # Move doesn't resolve check
         self.grid[new_pos[0]][new_pos[1]] = piece  # place piece in new position
         self.grid[current_pos[0]][current_pos[1]] = None  # remove piece from current position
         self.moveHistory.append(
-            [piece.getAlgebraicPosition(), str(chr(new_pos[0] + 96)) + str(new_pos[1])]
+            [piece.get_algebraic_position(), str(chr((new_pos[0] + 1) + 96)) + str(new_pos[1] + 1)]
         )  # add move to history in algebraic notation
-        piece.setPosition(new_pos)  # update piece's internal position
+        piece.set_position(new_pos)  # update piece's internal position
         return True
 
     def is_check(self) -> Optional[PieceColor]:
         """Check if either king is in check and return the color of the king in check."""
-        white_king_pos, black_king_pos = None
+        white_king_pos: Optional[Piece] = None
+        black_king_pos: Optional[Piece] = None
         # Find the positions of both kings
-        for column in range(1, 9):
-            for row in range(1, 9):
+        for column in range(8):
+            for row in range(8):
                 piece: Optional[Piece] = self.grid[column][row]
                 if isinstance(piece, King):  # if piece is a king
-                    if piece.getColor() == PieceColor.WHITE:
+                    if piece.get_color() == PieceColor.WHITE:
                         white_king_pos = (column, row)  # store white king position
-                    elif piece.getColor() == PieceColor.BLACK:
+                    elif piece.get_color() == PieceColor.BLACK:
                         black_king_pos = (column, row)  # store black king position
+            if white_king_pos and black_king_pos:
+                break
 
         # Check if any piece can attack the opposing king
-        for column in range(1, 9):
-            for row in range(1, 9):
+        for column in range(8):
+            for row in range(8):
                 piece: Optional[Piece] = self.grid[column][row]
                 if piece:
-                    if piece.getColor() == PieceColor.WHITE and black_king_pos:  # if white piece and black king exists
+                    if piece.get_color() == PieceColor.WHITE and black_king_pos:  # if white piece and black king exists
                         if piece.is_valid_move((column, row), black_king_pos, self.grid):  # check if piece can attack black king
                             return PieceColor.BLACK  # black king is in check
-                    elif piece.getColor() == PieceColor.BLACK and white_king_pos:  # if black piece and white king exists
+                    elif piece.get_color() == PieceColor.BLACK and white_king_pos:  # if black piece and white king exists
                         if piece.is_valid_move((column, row), white_king_pos, self.grid):  # check if piece can attack white king
                             return PieceColor.WHITE  # white king is in check
 
         return None
 
-    def is_checkmate(self) -> bool:
+    def is_checkmate(self, checked_color) -> bool:
         """Check if the player whose king is in check has no valid moves to escape check."""
-        checked_color: Optional[PieceColor] = self.is_check()  # get color of king in check (if any)
-        if not checked_color:
-            return False
 
         # Try every possible move for the checked player
-        for col1 in range(1, 9):
-            for row1 in range(1, 9):
+        for col1 in range(8):
+            for row1 in range(8):
                 piece: Optional[Piece] = self.grid[col1][row1]
-                if piece and piece.getColor() == checked_color:
-                    for col2 in range(1, 9):
-                        for row2 in range(1, 9):
+                if piece and piece.get_color() == checked_color:
+                    for col2 in range(8):
+                        for row2 in range(8):
                             if piece.is_valid_move((col1, row1), (col2, row2), self.grid):
-                                # Try the move
-                                original_piece = self.grid[row2][col2]
+                                # Save original state
+                                captured = self.grid[col2][row2]
                                 self.grid[col2][row2] = piece
                                 self.grid[col1][row1] = None
-                                piece.setPosition((col2, row2))
+                                original_pos = piece.position
+                                piece.set_position((col2, row2))
 
-                                # Check if still in check
                                 still_in_check = self.is_check() == checked_color
 
-                                # Undo the move
+                                # Undo
                                 self.grid[col1][row1] = piece
-                                self.grid[col2][row2] = original_piece
-                                piece.setPosition((col1, row1))
+                                self.grid[col2][row2] = captured
+                                piece.set_position(original_pos)
 
                                 if not still_in_check:
-                                    return False  # Found a move that avoids check
+                                    return False
 
         return True
 
@@ -161,34 +161,38 @@ class Piece:
 
     Attributes:
         color (PieceColor): Color of the piece (white or black)
-        position (str): Current position in algebraic notation (e.g., 'e4')
+        position (str): Position of the piece on the board as a tuple (column, row)
         symbol (str): Character representation of the piece
     """
 
     def __init__(self, color, position, symbol):
         self.color = color
-        self.position = str(chr(position[0] + 96)) + str(position[1])
+        self.position = position
         self.symbol = symbol
 
     def is_valid_move(self, current_pos, next_pos, board):
         """Abstract method to check if a move is valid for the piece."""
         raise NotImplementedError("Subclasses should implement this method")
 
-    def getPosition(self) -> Tuple[int, int]:
+    def get_position(self) -> Tuple[int, int]:
         """Return the current position of the piece as a tuple (column, row)."""
-        return (int(ord(self.position[0]) - 96), int(self.position[1]))
-
-    def getAlgebraicPosition(self) -> str:
-        """Return the current position of the piece in algebraic notation (e.g., 'e4')."""
         return self.position
 
-    def setPosition(self, newPos: Tuple[int, int]):
-        """Set the position of the piece to a new position in algebraic notation."""
-        self.position = str(chr(newPos[0] + 96)) + str(newPos[1])
+    def get_algebraic_position(self) -> str:
+        """Return the current position of the piece in algebraic notation (e.g., 'e4')."""
+        return str(chr((self.position[0] + 1) + 96)) + str(self.position[1] + 1)
 
-    def getColor(self) -> PieceColor:
+    def set_position(self, newPos: Tuple[int, int]):
+        """Set the position of the piece to a new position."""
+        self.position = newPos
+
+    def get_color(self) -> PieceColor:
         """Return the color of the piece ('white' or 'black')."""
         return self.color
+
+    def get_symbol(self) -> str:
+        """Return the symbol of the piece (e.g., 'P' for Pawn, 'R' for Rook)."""
+        return self.symbol
 
 
 class Pawn(Piece):
@@ -212,14 +216,14 @@ class Pawn(Piece):
         new_x, new_y = next_pos
         movement: int = new_y - current_y
         if current_x == new_x and not grid[new_x][new_y]:  # vertical movement with no piece in the new position
-            if super().color == PieceColor.WHITE:
-                if current_y == 2:  # checks if it's the first move as the pawns can move two squares in first move
+            if super().get_color() == PieceColor.WHITE:
+                if current_y == 1:  # checks if it's the first move as the pawns can move two squares in first move
                     if movement > 0 and movement < 3:
                         return True
                 elif movement == 1:  # regular forward movement (one square only)
                     return True
             else:
-                if current_y == 7:  # checks if it's the first move as the pawns can move two squares in first move
+                if current_y == 6:  # checks if it's the first move as the pawns can move two squares in first move
                     if movement > -3 and movement < 0:
                         return True
                 elif movement == -1:  # regular forward movement (one square only)
@@ -228,11 +232,11 @@ class Pawn(Piece):
             x_movement: int = new_x - current_x
             new_piece: Optional[Piece] = grid[new_x][new_y]
             if (x_movement == -1 or x_movement == 1) and new_piece is not None:  # Checks if there is a piece in diagonal
-                if super().color == PieceColor.WHITE:
-                    if movement == 1 and new_piece.getColor() == PieceColor.BLACK:
+                if super().get_color() == PieceColor.WHITE:
+                    if movement == 1 and new_piece.get_color() == PieceColor.BLACK:
                         return True
-                elif super().color == PieceColor.BLACK:
-                    if movement == -1 and new_piece.getColor() == PieceColor.WHITE:
+                elif super().get_color() == PieceColor.BLACK:
+                    if movement == -1 and new_piece.get_color() == PieceColor.WHITE:
                         return True
         return False
 
@@ -257,7 +261,7 @@ class Rook(Piece):
         next_x, next_y = next_pos
         y_movement: int = next_y - current_y
         x_movement: int = next_x - current_x
-        if grid[next_x][next_y] and grid[next_x][next_y].getColor() == super().color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
             return False  # cannot capture own piece
 
         if x_movement == 0 and y_movement != 0:  # Check vertical movement (same x, different y)
@@ -304,7 +308,7 @@ class Knight(Piece):
         next_x, next_y = next_pos
         x_movement: int = next_x - current_x
         y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].getColor() == super().color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
             return False  # cannot capture own piece
         if x_movement != 0 and y_movement != 0:  # non-orthogonal movement
             if y_movement > -3 and y_movement < 3 and x_movement > -3 and x_movement < 3:  # check if within L-shape range
@@ -338,14 +342,18 @@ class Bishop(Piece):
         next_x, next_y = next_pos
         x_movement: int = next_x - current_x
         y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].getColor() == super().color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
             return False  # cannot capture own piece
-        if x_movement == y_movement and x_movement != 0:  # diagonal movement (same magnitude in x and y)
-            for i in range(current_x, next_x):  # check path for obstacles
-                if grid[i][i]:
+        if abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
+            dx = 1 if x_movement > 0 else -1
+            dy = 1 if y_movement > 0 else -1
+            x, y = current_x + dx, current_y + dy
+            while x != next_x:
+                if grid[x][y]:
                     return False
+                x += dx
+                y += dy
             return True
-        return False
 
 
 class Queen(Piece):
@@ -367,7 +375,7 @@ class Queen(Piece):
         next_x, next_y = next_pos
         x_movement: int = next_x - current_x
         y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].getColor() == super().color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
             return False  # cannot capture own piece
         if x_movement == 0 and y_movement != 0:  # vertical movement (like a rook)
             start_y: int = min(current_y, next_y) + 1
@@ -383,10 +391,15 @@ class Queen(Piece):
                 if grid[i][current_y]:
                     return False
             return True
-        elif x_movement == y_movement and x_movement != 0:  # diagonal movement (like a bishop)
-            for i in range(current_x, next_x):  # check path for obstacles
-                if grid[i][i]:
+        elif abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
+            dx = 1 if x_movement > 0 else -1
+            dy = 1 if y_movement > 0 else -1
+            x, y = current_x + dx, current_y + dy
+            while x != next_x and y != next_y:
+                if grid[x][y]:
                     return False
+                x += dx
+                y += dy
             return True
         return False
 
@@ -411,7 +424,7 @@ class King(Piece):
         next_x, next_y = next_pos
         x_movement: int = next_x - current_x
         y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].getColor() == super().color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
             return False  # cannot capture own piece
         if x_movement != 0 or y_movement != 0:  # ensure some movement is happening
             if (
@@ -437,33 +450,59 @@ class Game:
     def __init__(self):
         self.board = None
         self.turn = PieceColor.WHITE  # Default starting player
-        self.game_status = "active"  # Can be "active", "checkmate", "stalemate", "draw"
+        self.game_status = "not_started"  # Can be "active", "checkmate", "stalemate", "draw"
         self.winner = None
         self.difficulty = Difficulty.MEDIUM  # Default difficulty level
+        self.player_white = ""
+        self.player_black = ""
 
-    def start_game(self, difficulty: Difficulty = Difficulty.MEDIUM):
+    def start_game(self, difficulty: Difficulty, white_player: str, black_player: str):
         """Initialize a new game with the specified difficulty level"""
         self.board = Board()
         self.turn = PieceColor.WHITE
         self.game_status = "active"
         self.winner = None
         self.difficulty: Difficulty = difficulty
+        self.player_white = white_player
+        self.player_black = black_player
 
-    def reset_game(self):
-        """Reset the game to its initial state"""
-        self.start_game(self.difficulty)
+    def end_game(self):
+        """End the game and reset the board"""
+        self.board = None
+        self.turn = PieceColor.WHITE
+        self.game_status = "not_started"
+        self.winner = None
+        self.difficulty = Difficulty.MEDIUM
+        self.player_white = ""
+        self.player_black = ""
+
+    def serialize_board_to_symbols(self, board_grid):
+        """Converts the Board object's grid into a simple 2D list of piece symbols."""
+        if not board_grid:
+            return None
+
+        serialized_grid = [[None for _ in range(8)] for _ in range(8)]
+        for r in range(8):
+            for c in range(8):
+                piece = board_grid[c][r]
+                if piece:
+                    serialized_grid[r][c] = piece.get_symbol()
+        return serialized_grid
 
     def get_game_state(self):
         """Return the current state of the game"""
+        check: Optional[PieceColor] = self.board.is_check()
         return {
-            "board": self.board.grid,
-            "turn": self.turn,
+            "board": self.serialize_board_to_symbols(self.board.grid),
+            "turn": self.turn.value,
             "status": self.game_status,
-            "winner": self.winner,
-            "check": self.board.is_check(),
+            "winner": str(self.winner.value) if self.winner else None,
+            "is_check": check.value if check else None,
+            "move_history": self.get_move_history(),
+            "players": {"white": self.player_white, "black": self.player_black},
         }
 
-    def make_move(self, current_pos: Tuple[list, list], new_pos: Tuple[list, list]) -> bool:
+    def make_move(self, current_pos: Tuple[list, list], new_pos: Tuple[list, list]) -> (bool, str):
         """Process a move and update game state accordingly"""
         # Check if game is already over
         if self.game_status != "active":
@@ -475,13 +514,15 @@ class Game:
             return False, "No piece at the starting position"
 
         # Validate piece color
-        if piece.getColor() != self.turn:
+        if piece.get_color() != self.turn:
             return False, f"It's {self.turn}'s turn to move"
 
         # Attempt to make the move
         move_successful = self.board.move_piece(current_pos, new_pos)
         if not move_successful:
-            return False
+            if self.board.is_check():
+                return False, "Invalid move: King is in check"
+            return False, "Invalid move for the piece"
 
         # Check for checkmate and stalemate after move
         self.check_game_end_conditions()
@@ -490,18 +531,17 @@ class Game:
         if self.game_status == "active":
             self.turn = PieceColor.BLACK if self.turn == PieceColor.WHITE else PieceColor.WHITE
 
-        return True
+        return True, "Move successful"
 
-    def _check_game_end_conditions(self) -> Optional[Tuple[str, PieceColor]]:
+    def check_game_end_conditions(self) -> Optional[Tuple[str, PieceColor]]:
         """Check if the game has ended (checkmate, stalemate)"""
         # Check for checkmate
         checked_color: Optional[str] = self.board.is_check()
         if checked_color:
-            if self.board.is_checkmate():
+            if self.board.is_checkmate(checked_color):
                 self.game_status = "checkmate"
                 self.winner = PieceColor.WHITE if checked_color == PieceColor.BLACK else PieceColor.BLACK
                 return self.game_status, self.winner
-
         # Game continues
         self.game_status = "active"
 

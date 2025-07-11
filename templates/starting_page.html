@@ -1,0 +1,29 @@
+<!-- 
+  This template renders the initial page for starting a new chess game.
+  It allows users to input names for the white and black players.
+-->
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- The main body content for the starting page. -->
+
+<body id="starting-page-body">
+    <div class="container">
+        <h1>Start Chess Game</h1>
+
+        <!-- Input field for the white player's name. -->
+        <input type="text" id="white_player" placeholder="White Player's Name" />
+
+        <!-- Input field for the black player's name. -->
+        <input type="text" id="black_player" placeholder="Black Player's Name" />
+
+        <!-- This paragraph element is used to display validation errors, such as missing player names. -->
+        <p id="start_error_message" class="error_text"></p>
+
+        <!-- The button that initiates the game start process. -->
+        <button id="start_button">Start Game</button>
+    </div>
+</body>
+
+{% endblock %}

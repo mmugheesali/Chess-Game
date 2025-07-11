@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- 
+  This template defines the main interface for an active chess game.
+  It includes the chessboard, player information panels, a move history log,
+  and controls for the game.
+-->
+
+<body id="chess-body">
+    <!-- Main wrapper that organizes the layout into a game area and a sidebar. -->
+    <div class="game-layout">
+
+        <!-- This section contains the core visual components of the game: the board and player info. -->
+        <div class="main-game-area">
+
+            <!-- Displays information for the black player, positioned at the top of the board. -->
+            <div class="player-panel top">
+                <!-- Dynamically updated with the black player's name. -->
+                <span class="player-name" id="black-player-name">Black Player</span>
+                <!-- Visual indicator to show when it is the black player's turn. -->
+                <span class="turn-indicator" id="black-turn-indicator"></span>
+            </div>
+
+            <!-- Container for the chessboard to help with centering and layout. -->
+            <div class="board-container">
+                <!-- The chessboard, structured as a grid of 64 div elements representing squares. -->
+                <div class="board">
+                    <!-- Each div is a square with a unique ID (e.g., 'a8', 'h1') and alternating 'light'/'dark' classes. -->
+                    <!-- Row 8 -->
+                    <div class="square light" id="a8"><span class="row-label dark-label">8</span></div>
+                    <div class="square dark" id="b8"></div>
+                    <div class="square light" id="c8"></div>
+                    <div class="square dark" id="d8"></div>
+                    <div class="square light" id="e8"></div>
+                    <div class="square dark" id="f8"></div>
+                    <div class="square light" id="g8"></div>
+                    <div class="square dark" id="h8"></div>
+                    <!-- Row 7 -->
+                    <div class="square dark" id="a7"><span class="row-label light-label">7</span></div>
+                    <div class="square light" id="b7"></div>
+                    <div class="square dark" id="c7"></div>
+                    <div class="square light" id="d7"></div>
+                    <div class="square dark" id="e7"></div>
+                    <div class="square light" id="f7"></div>
+                    <div class="square dark" id="g7"></div>
+                    <div class="square light" id="h7"></div>
+                    <!-- Row 6 -->
+                    <div class="square light" id="a6"><span class="row-label dark-label">6</span></div>
+                    <div class="square dark" id="b6"></div>
+                    <div class="square light" id="c6"></div>
+                    <div class="square dark" id="d6"></div>
+                    <div class="square light" id="e6"></div>
+                    <div class="square dark" id="f6"></div>
+                    <div class="square light" id="g6"></div>
+                    <div class="square dark" id="h6"></div>
+                    <!-- Row 5 -->
+                    <div class="square dark" id="a5"><span class="row-label light-label">5</span></div>
+                    <div class="square light" id="b5"></div>
+                    <div class="square dark" id="c5"></div>
+                    <div class="square light" id="d5"></div>
+                    <div class="square dark" id="e5"></div>
+                    <div class="square light" id="f5"></div>
+                    <div class="square dark" id="g5"></div>
+                    <div class="square light" id="h5"></div>
+                    <!-- Row 4 -->
+                    <div class="square light" id="a4"><span class="row-label dark-label">4</span></div>
+                    <div class="square dark" id="b4"></div>
+                    <div class="square light" id="c4"></div>
+                    <div class="square dark" id="d4"></div>
+                    <div class="square light" id="e4"></div>
+                    <div class="square dark" id="f4"></div>
+                    <div class="square light" id="g4"></div>
+                    <div class="square dark" id="h4"></div>
+                    <!-- Row 3 -->
+                    <div class="square dark" id="a3"><span class="row-label light-label">3</span></div>
+                    <div class="square light" id="b3"></div>
+                    <div class="square dark" id="c3"></div>
+                    <div class="square light" id="d3"></div>
+                    <div class="square dark" id="e3"></div>
+                    <div class="square light" id="f3"></div>
+                    <div class="square dark" id="g3"></div>
+                    <div class="square light" id="h3"></div>
+                    <!-- Row 2 -->
+                    <div class="square light" id="a2"><span class="row-label dark-label">2</span></div>
+                    <div class="square dark" id="b2"></div>
+                    <div class="square light" id="c2"></div>
+                    <div class="square dark" id="d2"></div>
+                    <div class="square light" id="e2"></div>
+                    <div class="square dark" id="f2"></div>
+                    <div class="square light" id="g2"></div>
+                    <div class="square dark" id="h2"></div>
+                    <!-- Row 1 with Column Labels -->
+                    <div class="square dark" id="a1"><span class="row-label light-label">1</span><span
+                            class="column-label light-label">a</span></div>
+                    <div class="square light" id="b1"><span class="column-label dark-label">b</span></div>
+                    <div class="square dark" id="c1"><span class="column-label light-label">c</span></div>
+                    <div class="square light" id="d1"><span class="column-label dark-label">d</span></div>
+                    <div class="square dark" id="e1"><span class="column-label light-label">e</span></div>
+                    <div class="square light" id="f1"><span class="column-label dark-label">f</span></div>
+                    <div class="square dark" id="g1"><span class="column-label light-label">g</span></div>
+                    <div class="square light" id="h1"><span class="column-label dark-label">h</span></div>
+                </div>
+            </div>
+
+            <!-- Displays information for the white player, positioned at the bottom of the board. -->
+            <div class="player-panel bottom">
+                <!-- Dynamically updated with the white player's name. -->
+                <span class="player-name" id="white-player-name">White Player</span>
+                <!-- Visual indicator to show when it is the white player's turn. -->
+                <span class="turn-indicator" id="white-turn-indicator"></span>
+            </div>
+        </div>
+
+        <!-- Sidebar area for move history and game action controls. -->
+        <div class="sidebar">
+            <h3>Move History</h3>
+            <!-- Scrollable container for the move history table. -->
+            <div class="move-history-container">
+                <table class="move-history-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>White</th>
+                            <th>Black</th>
+                        </tr>
+                    </thead>
+                    <!-- The table body is populated by JavaScript as moves are made. -->
+                    <tbody id="move-history-body">
+                        <!-- Example row (commented out): <tr><td>1.</td><td>e4</td><td>e5</td></tr> -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Section for game-level action buttons. -->
+            <div class="game-controls">
+                <!-- Button to end the current game and return to the starting page. -->
+                <button id="end_button">New Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- A semi-transparent overlay that covers the page when the modal is active. Hidden by default. -->
+    <div id="modal-overlay" class="hidden"></div>
+
+    <!-- Modal dialog to announce the end of the game. Hidden by default. -->
+    <div id="game-over-modal" class="hidden">
+        <h2>Game Over</h2>
+        <!-- The message here is updated by JavaScript to reflect the game's outcome (e.g., checkmate, stalemate). -->
+        <p id="game-over-message">Checkmate! White wins.</p>
+        <!-- Button to start a new game by redirecting to the homepage. -->
+        <button onclick="window.location.href='/'">Play Again</button>
+    </div>
+
+    <!-- A container for displaying short, temporary pop-up messages (toasts), e.g., for "Check!". -->
+    <div id="toast-container"></div>
+</body>
+{% endblock %}
