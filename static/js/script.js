@@ -69,20 +69,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // --- Logic for the Starting Page ---
     if (pageId === "starting-page-body") {
-        const startButton = document.getElementById("start_button");
-        const whiteInput = document.getElementById("white_player");
-        const blackInput = document.getElementById("black_player");
-
-        if (startButton) {
-            startButton.addEventListener("click", startGame);
-        }
-        // Allow pressing 'Enter' in input fields to start the game
-        whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-        blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-
-        // Clear error messages when the user starts typing
-        whiteInput.addEventListener('input', clearStartError);
-        blackInput.addEventListener('input', clearStartError);
+        setupStartingPageListeners();
     }
     // --- Logic for the Main Chess Game Page ---
     else if (pageId === "chess-body") {
@@ -102,6 +89,52 @@ async function initializeBoard() {
     await updateGameState(); // Fetch initial state and render
     setupSquareEventListeners(); // Add interactivity to squares
     document.querySelector(".board").classList.add("ready"); // Show board to prevent FOUC
+}
+
+
+/**
+ * Sets up all event listeners for the starting page.
+ */
+function setupStartingPageListeners() {
+    const startButton = document.getElementById("start_button");
+    const whiteInput = document.getElementById("white_player");
+    const blackInput = document.getElementById("black_player");
+    const gameModeRadios = document.querySelectorAll('input[name="game_mode"]');
+
+    if (startButton) {
+        startButton.addEventListener("click", startGame);
+    }
+    // Allow pressing 'Enter' in input fields to start the game
+    whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+    blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+
+    // Clear error messages when the user starts typing
+    whiteInput.addEventListener('input', clearStartError);
+    blackInput.addEventListener('input', clearStartError);
+
+    // Add listeners for game mode change
+    gameModeRadios.forEach(radio => {
+        radio.addEventListener('change', handleGameModeChange);
+    });
+}
+
+/**
+ * Handles the change of the game mode radio buttons.
+ * Shows/hides the black player name input or the AI difficulty dropdown.
+ */
+function handleGameModeChange() {
+    const selectedMode = document.querySelector('input[name="game_mode"]:checked').value;
+    const blackPlayerInput = document.getElementById('black_player_input_container');
+    const aiDifficultySelect = document.getElementById('ai_difficulty_container');
+
+    if (selectedMode === 'single_player') {
+        blackPlayerInput.classList.add('hidden');
+        aiDifficultySelect.classList.remove('hidden');
+    } else { // two_player
+        blackPlayerInput.classList.remove('hidden');
+        aiDifficultySelect.classList.add('hidden');
+    }
+    clearStartError(); // Clear errors when mode changes
 }
 
 
@@ -450,19 +483,24 @@ function showStartError(message) {
     const errorEl = document.getElementById('start_error_message');
     const whiteInput = document.getElementById('white_player');
     const blackInput = document.getElementById('black_player');
+    const selectedMode = document.querySelector('input[name="game_mode"]:checked').value;
 
     errorEl.textContent = message;
     errorEl.classList.add('visible');
 
     if (!whiteInput.value.trim()) whiteInput.classList.add('input-error');
-    if (!blackInput.value.trim()) blackInput.classList.add('input-error');
+    if (selectedMode == 'two_player' && !blackInput.value.trim()) {
+        blackInput.classList.add('input-error')
+    };
 }
 
 /**
  * Clears any visible error messages and input highlighting on the starting page.
  */
 function clearStartError() {
-    document.getElementById('start_error_message').classList.remove('visible');
+    const errorEl = document.getElementById('start_error_message');
+    errorEl.textContent = ''; // Clear the message text
+    errorEl.classList.remove('visible'); // Hide the element by removing the class
     document.getElementById('white_player').classList.remove('input-error');
     document.getElementById('black_player').classList.remove('input-error');
 }
@@ -479,14 +517,27 @@ function clearStartError() {
  */
 function startGame() {
     const whitePlayer = document.getElementById("white_player").value.trim();
-    const blackPlayer = document.getElementById("black_player").value.trim();
     const startButton = document.getElementById("start_button");
+    const selectedMode = document.querySelector("input[name='game_mode']:checked").value
 
     clearStartError();
 
-    if (!whitePlayer || !blackPlayer) {
-        showStartError("Please enter names for both players.");
-        return;
+    let payload = {};
+
+    if (selectedMode === 'two_player') {
+        const blackPlayer = document.getElementById("black_player").value.trim();
+        if (!whitePlayer || !blackPlayer) {
+            showStartError("Please enter names for both players.");
+            return;
+        }
+        payload = { player_white: whitePlayer, player_black: blackPlayer };
+    } else { //single_player
+        const aiDifficulty = document.getElementById("ai_difficulty").value;
+        if (!whitePlayer) {
+            showStartError("Please enter a name for the white player.");
+            return;
+        }
+        payload = { player_white: whitePlayer, player_black: `AI (${aiDifficulty})`, ai_difficulty: aiDifficulty };
     }
 
     // Disable button to prevent multiple clicks
@@ -496,7 +547,7 @@ function startGame() {
     fetch("/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_white: whitePlayer, player_black: blackPlayer })
+        body: JSON.stringify(payload)
     })
         .then(async (response) => {
             const data = await response.json();
