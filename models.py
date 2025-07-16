@@ -62,37 +62,28 @@ class Board:
         # Check if piece exists and if the move is valid
         if not piece or not piece.is_valid_move(current_pos, new_pos, self.grid):
             return False
-        in_check_color: Optional[PieceColor] = self.is_check()  # check if any king is in check
-        if in_check_color and piece.get_color() == in_check_color:  # if piece's king is in check
-            # Try the move
-            captured_piece: Optional[Piece] = self.grid[new_pos[0]][new_pos[1]]  # store potentially captured piece
 
-            # Make the move temporarily
-            self.grid[new_pos[0]][new_pos[1]] = piece  # place piece in new position
-            self.grid[current_pos[0]][current_pos[1]] = None  # remove piece from current position
-            piece.set_position(new_pos)  # update piece's internal position
+        # Temporarily make the move to check for self-check
+        captured_piece = self.grid[new_pos[0]][new_pos[1]]
+        self.grid[new_pos[0]][new_pos[1]] = piece
+        self.grid[current_pos[0]][current_pos[1]] = None
 
-            still_in_check: bool = self.is_check() == in_check_color  # Check if still in check after the move
+        # Check if the move puts the current player's king in check
+        if self.is_check() == piece.get_color():
+            # If so, undo the move and return False
+            self.grid[current_pos[0]][current_pos[1]] = piece
+            self.grid[new_pos[0]][new_pos[1]] = captured_piece
+            return False
 
-            # Undo the move
-            self.grid[current_pos[0]][current_pos[1]] = piece  # restore piece to original position
-            self.grid[new_pos[0]][new_pos[1]] = captured_piece  # restore captured piece if any
-            piece.set_position(current_pos)  # reset piece's internal position
-
-            if still_in_check:
-                return False  # Move doesn't resolve check
-        self.grid[new_pos[0]][new_pos[1]] = piece  # place piece in new position
-        self.grid[current_pos[0]][current_pos[1]] = None  # remove piece from current position
-        self.moveHistory.append(
-            [piece.get_algebraic_position(), str(chr((new_pos[0] + 1) + 96)) + str(new_pos[1] + 1)]
-        )  # add move to history in algebraic notation
-        piece.set_position(new_pos)  # update piece's internal position
+        # If the move is legal, finalize it
+        piece.set_position(new_pos)
+        self.moveHistory.append([piece.pos_to_algebraic(current_pos), piece.pos_to_algebraic(new_pos)])
         return True
 
     def is_check(self) -> Optional[PieceColor]:
         """Check if either king is in check and return the color of the king in check."""
-        white_king_pos: Optional[Piece] = None
-        black_king_pos: Optional[Piece] = None
+        white_king_pos: Optional[Tuple[int, int]] = None
+        black_king_pos: Optional[Tuple[int, int]] = None
         # Find the positions of both kings
         for column in range(8):
             for row in range(8):
@@ -174,13 +165,19 @@ class Piece:
         """Abstract method to check if a move is valid for the piece."""
         raise NotImplementedError("Subclasses should implement this method")
 
+    @staticmethod
+    def pos_to_algebraic(pos: Tuple[int, int]) -> str:
+        """Converts a (col, row) tuple to algebraic notation string."""
+        col, row = pos
+        return f"{chr(col + ord('a'))}{row + 1}"
+
     def get_position(self) -> Tuple[int, int]:
         """Return the current position of the piece as a tuple (column, row)."""
         return self.position
 
     def get_algebraic_position(self) -> str:
         """Return the current position of the piece in algebraic notation (e.g., 'e4')."""
-        return str(chr((self.position[0] + 1) + 96)) + str(self.position[1] + 1)
+        return self.pos_to_algebraic(self.position)
 
     def set_position(self, newPos: Tuple[int, int]):
         """Set the position of the piece to a new position."""
@@ -214,30 +211,29 @@ class Pawn(Piece):
         """Check if the pawn's move is valid based on its current position and the next position."""
         current_x, current_y = current_pos
         new_x, new_y = next_pos
-        movement: int = new_y - current_y
-        if current_x == new_x and not grid[new_x][new_y]:  # vertical movement with no piece in the new position
-            if super().get_color() == PieceColor.WHITE:
-                if current_y == 1:  # checks if it's the first move as the pawns can move two squares in first move
-                    if movement > 0 and movement < 3:
-                        return True
-                elif movement == 1:  # regular forward movement (one square only)
-                    return True
-            else:
-                if current_y == 6:  # checks if it's the first move as the pawns can move two squares in first move
-                    if movement > -3 and movement < 0:
-                        return True
-                elif movement == -1:  # regular forward movement (one square only)
-                    return True
-        else:  # diagonal capture logic
-            x_movement: int = new_x - current_x
-            new_piece: Optional[Piece] = grid[new_x][new_y]
-            if (x_movement == -1 or x_movement == 1) and new_piece is not None:  # Checks if there is a piece in diagonal
-                if super().get_color() == PieceColor.WHITE:
-                    if movement == 1 and new_piece.get_color() == PieceColor.BLACK:
-                        return True
-                elif super().get_color() == PieceColor.BLACK:
-                    if movement == -1 and new_piece.get_color() == PieceColor.WHITE:
-                        return True
+        direction = 1 if self.color == PieceColor.WHITE else -1  # White moves up, Black moves down
+        start_row = 1 if self.color == PieceColor.WHITE else 6  # Starting row for pawns
+        # Standard 1-square move
+        if current_x == new_x and new_y == current_y + direction and not grid[new_x][new_y]:
+            return True
+        # Initial 2-square move
+        if (
+            current_x == new_x
+            and current_y == start_row
+            and new_y == current_y + 2 * direction
+            and not grid[new_x][new_y]
+            and not grid[current_x][current_y + direction]
+        ):
+            return True
+        # Capture move
+        if (
+            abs(current_x - new_x) == 1
+            and current_y + direction == new_y
+            and grid[new_x][new_y]
+            and grid[new_x][new_y].get_color() != self.color
+        ):
+            return True
+
         return False
 
 
@@ -259,28 +255,19 @@ class Rook(Piece):
         """Check if the rook's move is valid based on its current position and the next position."""
         current_x, current_y = current_pos
         next_x, next_y = next_pos
-        y_movement: int = next_y - current_y
-        x_movement: int = next_x - current_x
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == self.color:
             return False  # cannot capture own piece
 
-        if x_movement == 0 and y_movement != 0:  # Check vertical movement (same x, different y)
-            start_y: int = min(current_y, next_y) + 1
-            end_y: int = max(current_y, next_y)
-
-            # Check for pieces in the path (excluding start and end positions)
-            for i in range(start_y, end_y):
-                if grid[current_x][i]:
+        if current_x == next_x:
+            step = 1 if next_y > current_y else -1
+            for y in range(current_y + step, next_y, step):
+                if grid[current_x][y]:
                     return False
             return True
-
-        elif x_movement != 0 and y_movement == 0:  # Check horizontal movement (different x, same y)
-            start_x: int = min(current_x, next_x) + 1
-            end_x: int = max(current_x, next_x)
-
-            # Check for pieces in the path (excluding start and end positions)
-            for i in range(start_x, end_x):
-                if grid[i][current_y]:
+        if current_y == next_y:
+            step = 1 if next_x > current_x else -1
+            for x in range(current_x + step, next_x, step):
+                if grid[x][current_y]:
                     return False
             return True
 
@@ -306,21 +293,11 @@ class Knight(Piece):
         """Check if the knight's move is valid based on its current position and the next position."""
         current_x, current_y = current_pos
         next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == self.color:
             return False  # cannot capture own piece
-        if x_movement != 0 and y_movement != 0:  # non-orthogonal movement
-            if y_movement > -3 and y_movement < 3 and x_movement > -3 and x_movement < 3:  # check if within L-shape range
-                if (y_movement == 2 or y_movement == -2) and (
-                    x_movement == 1 or x_movement == -1
-                ):  # L-shape: 2 vertical, 1 horizontal
-                    return True
-                if (y_movement == 1 or y_movement == -1) and (
-                    x_movement == 2 or x_movement == -2
-                ):  # L-shape: 1 vertical, 2 horizontal
-                    return True
-        return False
+        dx = abs(next_x - current_x)
+        dy = abs(next_y - current_y)
+        return (dx == 2 and dy == 1) or (dx == 1 and dy == 2)  # L-shape movement
 
 
 class Bishop(Piece):
@@ -340,20 +317,19 @@ class Bishop(Piece):
     def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
         current_x, current_y = current_pos
         next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == self.color:
             return False  # cannot capture own piece
-        if abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
-            dx = 1 if x_movement > 0 else -1
-            dy = 1 if y_movement > 0 else -1
-            x, y = current_x + dx, current_y + dy
-            while x != next_x:
-                if grid[x][y]:
-                    return False
-                x += dx
-                y += dy
-            return True
+        if abs(current_x - next_x) != abs(current_y - next_y):
+            return False  # must move diagonally
+        dx = 1 if next_x > current_x else -1
+        dy = 1 if next_y > current_y else -1
+        x, y = current_x + dx, current_y + dy
+        while x != next_x:
+            if grid[x][y]:
+                return False
+            x += dx
+            y += dy
+        return True
 
 
 class Queen(Piece):
@@ -371,37 +347,8 @@ class Queen(Piece):
         super().__init__(color, position, "Q" if color == PieceColor.WHITE else "q")
 
     def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-        if x_movement == 0 and y_movement != 0:  # vertical movement (like a rook)
-            start_y: int = min(current_y, next_y) + 1
-            end_y: int = max(current_y, next_y)
-            for i in range(start_y, end_y):  # check path for obstacles
-                if grid[current_x][i]:
-                    return False
-            return True
-        elif x_movement != 0 and y_movement == 0:  # horizontal movement (like a rook)
-            start_x: int = min(current_x, next_x) + 1
-            end_x: int = max(current_x, next_x)
-            for i in range(start_x, end_x):  # check path for obstacles
-                if grid[i][current_y]:
-                    return False
-            return True
-        elif abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
-            dx = 1 if x_movement > 0 else -1
-            dy = 1 if y_movement > 0 else -1
-            x, y = current_x + dx, current_y + dy
-            while x != next_x and y != next_y:
-                if grid[x][y]:
-                    return False
-                x += dx
-                y += dy
-            return True
-        return False
+        # A Queen's move is valid if it's a valid Rook or Bishop move
+        return Rook.is_valid_move(self, current_pos, next_pos, grid) or Bishop.is_valid_move(self, current_pos, next_pos, grid)
 
 
 class King(Piece):
@@ -422,15 +369,9 @@ class King(Piece):
         """Check if the king's move is valid based on its current position and the next position."""
         current_x, current_y = current_pos
         next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
+        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == self.color:
             return False  # cannot capture own piece
-        if x_movement != 0 or y_movement != 0:  # ensure some movement is happening
-            if (
-                x_movement > -2 and x_movement < 2 and y_movement > -2 and y_movement < 2
-            ):  # check movement is at most one square in any direction
-                return True
+        return abs(current_x - next_x) <= 1 and abs(current_y - next_y) <= 1
 
 
 class Game:
