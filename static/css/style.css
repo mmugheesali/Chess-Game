@@ -593,7 +593,10 @@ body {
     display: none !important;
 }
 
-
+.disabled {
+    pointer-events: none;
+    opacity: 0.5;
+}
 
 /*
 ==========================================================================
