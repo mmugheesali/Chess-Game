@@ -402,12 +402,6 @@ def load_game_from_file():
 
 
 if __name__ == "__main__":
-    # The following line is a runtime patch. It adds a helper method to the
-    # `Game.Board` class to convert algebraic notation (e.g., 'a1') to the
-    # 1-based coordinate system used internally by the `models.py` logic.
-    Game.Board.algebraic_to_tuple = lambda self, alg_pos: (ord(alg_pos[0].lower()) - ord("a") + 1, int(alg_pos[1]))
-
-    # Starts the Flask development server.
-    app.run(debug=True, port=5001)
+    app.run(debug=True)
 
 # --- END OF FILE app.py ---
