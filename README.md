@@ -1,8 +1,4 @@
-# Chess-Game
-
-This is a chess game. My frst big project.I'm making this as practice.I really hope I'll complete it.
 # Chess Game
-
 This project is a full-stack chess game built with Flask for the backend and HTML/CSS/JavaScript for the frontend. It is designed as a learning project and aims to provide a playable chess experience in the browser.
 
 ## Features
