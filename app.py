@@ -257,8 +257,6 @@ def load_game_from_file():
 
 
 if __name__ == "__main__":
-    # Add a helper function to models.py for converting algebraic to tuple
-    Game.Board.algebraic_to_tuple = lambda self, alg_pos: (ord(alg_pos[0].lower()) - ord("a") + 1, int(alg_pos[1]))
-    app.run(debug=True, port=5001)
+    app.run(debug=True)
 
 # --- END OF FILE app.py ---
