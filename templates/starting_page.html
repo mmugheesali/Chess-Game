@@ -21,17 +21,19 @@
             </label>
         </div>
 
-        <!-- Input field for the white player's name. -->
-        <input type="text" id="white_player" placeholder="White Player's Name" />
+        <!-- Container for the white player's input, shown for player modes -->
+        <div id="white_player_input_container">
+            <input type="text" id="white_player" placeholder="White Player's Name" />
+        </div>
 
         <!-- Container for the second player's input, shown for two-player mode -->
         <div id="black_player_input_container">
             <input type="text" id="black_player" placeholder="Black Player's Name" />
         </div>
 
-
         <!-- Container for the AI difficulty, shown for single-player mode -->
         <div id="ai_difficulty_container" class="hidden">
+            <label for="ai_difficulty">AI Difficulty:</label>
             <select id="ai_difficulty">
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>

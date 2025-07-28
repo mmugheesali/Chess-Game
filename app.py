@@ -15,7 +15,7 @@ import os
 import json
 import csv
 from flask import Flask, request, jsonify, render_template, url_for, redirect
-from models import Game, Difficulty, Piece, PieceColor, Pawn, Rook, Knight, Bishop, Queen, King
+from models import Game, Difficulty, PieceColor, Pawn, Rook, Knight, Bishop, Queen, King, GameMode
 
 app = Flask(__name__)
 
@@ -176,25 +176,44 @@ def start_game():
     """
     global game
     data = request.get_json()
-    difficulty = None
-    if not data or "player_white" not in data or "player_black" not in data or "game_mode" not in data:
-        return jsonify(
-            {"error": "Player names 'player_white' and 'player_black' must be provided.Along with the game mode."}
-        ), 400
+    if not data or "game_mode" not in data:
+        return jsonify({"error": "Game mode must be provided."}), 400
 
-    if data["game_mode"] == "player_vs_ai":
-        difficulty_str = data.get("difficulty")
+    game_mode = data.get("game_mode")
+
+    if game_mode == "player_vs_ai":
+        if "player_white" not in data:
+            return jsonify({"error": "Player name 'player_white' must be provided for player vs AI mode."}), 400
+
+        difficulty_str = data.get("difficulty", "medium")
         try:
             difficulty = Difficulty(difficulty_str.lower())
         except ValueError:
             return jsonify({"error": "Invalid difficulty. Choose from 'easy', 'medium', or 'hard'."}), 400
 
+        white_player = data["player_white"]
+        black_player = f"AI ({difficulty.value.title()})"
+        mode = GameMode.PLAYER_VS_AI
+
+    elif game_mode == "player_vs_player":
+        # Player vs Player mode
+        if "player_white" not in data or "player_black" not in data:
+            return jsonify({"error": "Player names 'player_white' and 'player_black' must be provided."}), 400
+
+        difficulty = None
+        white_player = data["player_white"]
+        black_player = data["player_black"]
+        mode = GameMode.PLAYER_VS_PLAYER
+
+    else:
+        return jsonify({"error": "Invalid game mode. Choose from 'player_vs_player', 'player_vs_ai', or 'ai_vs_ai'."}), 400
+
     game = Game()  # Create a fresh game instance
-    game.start_game(difficulty, data["player_white"], data["player_black"], data["game_mode"])
+    game.start_game(difficulty, white_player, black_player, mode)
 
     return jsonify(
         {
-            "message": f"New game started for {game.player_white} (White) vs. {game.player_black} (Black).",
+            "message": f"New game started: {game.player_white} (White) vs. {game.player_black} (Black).",
             "state": get_current_state_json(),
         }
     ), 200
@@ -278,26 +297,58 @@ def make_move():
         return jsonify({"error": message}), 400
 
 
-@app.route("/ai-move", methods=["GET"])
+@app.route("/ai-move", methods=["POST"])
 def ai_move():
-    """Generates and applies a move for the AI player.
-
-    This should be called when it is the AI's turn in a 'player_vs_ai' game.
-    It triggers the `game.make_ai_move` method to calculate and perform a move.
-
+    """Processes a move made by the AI.
+    This endpoint is called when the AI needs to make a move in a player vs AI game.
+    It checks if the game is active, then calls the `make_ai_move` method on the
+    global `game` object to let the AI make its move.
     Returns:
-        JSON: A message describing the AI's move and the updated game state,
-              or an error if an AI move cannot be made. (200 OK, 400 Bad Request)
+        JSON: A success message with the AI's move and the updated game state,
+              or an error message if the game is not active or the AI cannot move.
+              (200 OK, 400 Bad Request)
     """
-
-    if game.game_status != "active" or not game.ai_player:
-        return jsonify({"error": "AI move not available. Ensure the game is active and against AI."}), 400
+    if game.game_status != "active":
+        return jsonify({"error": f"Game not active (status: {game.game_status})."}), 400
 
     success, message = game.make_ai_move()
+
     if success:
-        return jsonify({"message": message, "state": get_current_state_json()}), 200
+        # Check if the game ended to update the leaderboard
+        if game.game_status == "checkmate":
+            winner = game.player_white if game.winner == PieceColor.WHITE else game.player_black
+            message = f"Checkmate! {winner} wins."
+
+        response = {"message": message, "state": get_current_state_json()}
+        return jsonify(response), 200
     else:
         return jsonify({"error": message}), 400
+
+
+@app.route("/possible-moves", methods=["GET"])
+def get_moves_for_piece():
+    """
+    Returns possible moves for a piece at a given square.
+    This endpoint accepts a square in algebraic notation (e.g., 'e4') and returns
+    a list of possible moves for the piece at that square.
+    Query Parameters:
+        square (str): The algebraic notation of the square (e.g., 'e4').
+    Returns:
+        JSON: A list of possible moves for the piece at the specified square,
+              or an error if the square is invalid or no piece exists there.
+              (200 OK, 400 Bad Request)
+    """
+    square = request.args.get("square")
+    if not square:
+        return jsonify({"error": "A 'square' parameter is required."}), 400
+
+    try:
+        pos_tuple = algebraic_to_tuple(square)
+    except ValueError:
+        return jsonify({"error": "Invalid algebraic notation for square."}), 400
+
+    possible_moves = game.get_possible_moves(pos_tuple)
+    return jsonify({"possible_moves": possible_moves}), 200
 
 
 @app.route("/leaderboard", methods=["GET"])
@@ -403,5 +454,3 @@ def load_game_from_file():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-# --- END OF FILE app.py ---

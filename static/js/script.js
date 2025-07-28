@@ -3,7 +3,7 @@
  * @description This script handles all user interactions, communicates with the
  * backend server via the Fetch API, and dynamically renders the game state. It manages
  * two primary pages: a starting page for game setup and the main game page. The script
-s * is event-driven, responding to user actions like clicks and drag-and-drop to play
+ * is event-driven, responding to user actions like clicks and drag-and-drop to play
  * the game.
  */
 
@@ -122,12 +122,14 @@ function setupStartingPageListeners() {
         startButton.addEventListener("click", startGame);
     }
     // Allow pressing 'Enter' in input fields to trigger the start game action.
-    whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-    blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-
-    // Clear validation errors when the user starts typing.
-    whiteInput.addEventListener('input', clearStartError);
-    blackInput.addEventListener('input', clearStartError);
+    if (whiteInput) {
+        whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+        whiteInput.addEventListener('input', clearStartError);
+    }
+    if (blackInput) {
+        blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+        blackInput.addEventListener('input', clearStartError);
+    }
 
     gameModeRadios.forEach(radio => {
         radio.addEventListener('change', handleGameModeChange);
@@ -135,20 +137,25 @@ function setupStartingPageListeners() {
 }
 
 /**
- * Handles the UI changes when the game mode (Player vs Player or Player vs AI) is switched.
- * It shows or hides the black player name input and the AI difficulty dropdown accordingly.
+ * Handles the UI changes when the game mode is switched.
+ * It shows or hides the appropriate input fields based on the selected mode.
  */
 function handleGameModeChange() {
     const selectedMode = document.querySelector('input[name="game_mode"]:checked').value;
     const blackPlayerInput = document.getElementById('black_player_input_container');
     const aiDifficultySelect = document.getElementById('ai_difficulty_container');
+    const whitePlayerInput = document.getElementById('white_player_input_container');
 
     if (selectedMode === 'single_player') {
-        blackPlayerInput.classList.add('hidden');
-        aiDifficultySelect.classList.remove('hidden');
+        // Player vs AI mode - show white player input and AI difficulty
+        if (whitePlayerInput) whitePlayerInput.classList.remove('hidden');
+        if (blackPlayerInput) blackPlayerInput.classList.add('hidden');
+        if (aiDifficultySelect) aiDifficultySelect.classList.remove('hidden');
     } else { // two_player
-        blackPlayerInput.classList.remove('hidden');
-        aiDifficultySelect.classList.add('hidden');
+        // Player vs Player mode - show both player inputs
+        if (whitePlayerInput) whitePlayerInput.classList.remove('hidden');
+        if (blackPlayerInput) blackPlayerInput.classList.remove('hidden');
+        if (aiDifficultySelect) aiDifficultySelect.classList.add('hidden');
     }
     clearStartError(); // Clear any validation errors when the mode changes.
 }
@@ -262,7 +269,12 @@ function renderBoard(state) {
 
                 pieceEl.className = `piece ${pieceColor}`;
                 pieceEl.textContent = PIECE_UNICODE[pieceSymbol];
-                pieceEl.draggable = (pieceColor === state.turn); // A piece is only draggable if it is its turn.
+
+                // Only make pieces draggable for human players in their turn
+                const isHumanTurn = (state.game_mode === 'player_vs_player') ||
+                    (state.game_mode === 'player_vs_ai' && state.turn === 'white');
+                pieceEl.draggable = isHumanTurn && (pieceColor === state.turn);
+
                 square.appendChild(pieceEl);
             }
         }
@@ -313,10 +325,15 @@ function renderGameInfo(state) {
     const historyContainer = document.querySelector('.move-history-container');
     historyContainer.scrollTop = historyContainer.scrollHeight;
 
-    // --- Trigger AI move if applicable ---
-    if (gameState.game_mode === 'player_vs_ai' && gameState.turn === 'black') {
+    // --- Trigger AI moves based on game mode ---
+    if (state.game_mode === 'player_vs_ai' && state.turn === 'black') {
+        // In Player vs AI mode, trigger AI move when it's black's turn
         disableBoardInteraction();
         setTimeout(triggerAIMove, 700); // Small delay for better UX.
+    } else if (state.game_mode === 'player_vs_player' ||
+        (state.game_mode === 'player_vs_ai' && state.turn === 'white')) {
+        // Enable board interaction for human players
+        enableBoardInteraction();
     }
 }
 
@@ -347,24 +364,36 @@ function setupSquareEventListeners() {
 
 /**
  * Handles a click event on a square for the click-to-move mechanic.
- * - If no piece is selected, it selects the clicked square if it contains a valid piece.
- * - If a piece is already selected, it attempts to move that piece to the clicked square.
+ * Only processes clicks for human players in appropriate game modes.
  * @param {Event} event - The click event object.
  */
-function handleClick(event) {
+async function handleClick(event) {
+    // Don't handle clicks when it's AI's turn
+    if (gameState.game_mode === 'player_vs_ai' && gameState.turn === 'black') return;
+
     const clickedSquare = event.currentTarget;
     const piece = clickedSquare.querySelector('.piece');
 
-    if (selectedSquare) { // A piece is already selected, this is the destination click.
+    if (selectedSquare) {
         if (clickedSquare.id === selectedSquare.id) {
-            clearSelection(); // Deselect if the same square is clicked again.
+            clearSelection();
             return;
         }
-        attemptMove(selectedSquare.id, clickedSquare.id);
-    } else if (piece) { // No piece is selected, this is the source click.
+        // Check if the destination is a valid possible move before attempting
+        if (clickedSquare.classList.contains('possible-move-dot') || clickedSquare.classList.contains('possible-move-capture')) {
+            await attemptMove(selectedSquare.id, clickedSquare.id);
+        } else {
+            // If an invalid square is clicked, deselect and re-select if it's another of our pieces
+            const isOurPiece = piece && (piece.classList.contains(gameState.turn));
+            clearSelection();
+            if (isOurPiece) {
+                await selectSquare(clickedSquare); // Re-select the new piece
+            }
+        }
+    } else if (piece) {
         const pieceColor = piece.classList.contains('white') ? 'white' : 'black';
         if (pieceColor === gameState.turn) {
-            selectSquare(clickedSquare); // Select the square if it's the current player's piece.
+            await selectSquare(clickedSquare); // Select the square
         }
     }
 }
@@ -373,9 +402,16 @@ function handleClick(event) {
 
 /**
  * Handles the `dragstart` event when a user begins dragging a piece.
+ * Only allows dragging for human players in appropriate game modes.
  * @param {DragEvent} event
  */
 function handleDragStart(event) {
+    // Don't allow dragging when it's AI's turn
+    if (gameState.game_mode === 'player_vs_ai' && gameState.turn === 'black') {
+        event.preventDefault();
+        return;
+    }
+
     const piece = event.target;
     if (piece.classList.contains('piece')) {
         draggedPiece = piece;
@@ -433,10 +469,22 @@ function handleDragEnd() {
  * Visually selects a square by adding the 'selected' CSS class.
  * @param {HTMLElement} square - The DOM element of the square to select.
  */
-function selectSquare(square) {
+async function selectSquare(square) {
     clearSelection();
     selectedSquare = square;
     square.classList.add('selected');
+
+    try {
+        const response = await fetch(`/possible-moves?square=${square.id}`);
+        if (!response.ok) throw new Error('Failed to fetch moves.');
+
+        const data = await response.json();
+        highlightPossibleMoves(data.possible_moves);
+
+    } catch (error) {
+        console.error("Error fetching possible moves:", error);
+        showToast(error.message);
+    }
 }
 
 /**
@@ -447,6 +495,32 @@ function clearSelection() {
         selectedSquare.classList.remove('selected');
     }
     selectedSquare = null;
+    // Remove all possible-move highlight classes
+    document.querySelectorAll('.possible-move-dot, .possible-move-capture').forEach(sq => {
+        sq.classList.remove('possible-move-dot');
+        sq.classList.remove('possible-move-capture');
+    });
+}
+
+/**
+ * Adds the 'possible-move' class to all squares in the provided list.
+ * @param {string[]} moves - A list of square IDs in algebraic notation (e.g., ['e3', 'e4']).
+ */
+function highlightPossibleMoves(moves) {
+    moves.forEach(moveId => {
+        const square = document.getElementById(moveId);
+        if (square) {
+            // Check if the square contains a piece
+            if (square.querySelector('.piece')) {
+                // It's a capture!
+                square.classList.add('possible-move-capture');
+            } else {
+                // It's an empty square.
+                square.classList.add('possible-move-dot');
+            }
+
+        }
+    });
 }
 
 /**
@@ -521,8 +595,8 @@ function showStartError(message) {
     errorEl.textContent = message;
     errorEl.classList.add('visible');
 
-    if (!whiteInput.value.trim()) whiteInput.classList.add('input-error');
-    if (selectedMode === 'two_player' && !blackInput.value.trim()) {
+    if (whiteInput && !whiteInput.value.trim()) whiteInput.classList.add('input-error');
+    if (selectedMode === 'two_player' && blackInput && !blackInput.value.trim()) {
         blackInput.classList.add('input-error');
     }
 }
@@ -532,10 +606,14 @@ function showStartError(message) {
  */
 function clearStartError() {
     const errorEl = document.getElementById('start_error_message');
-    errorEl.textContent = '';
-    errorEl.classList.remove('visible');
-    document.getElementById('white_player').classList.remove('input-error');
-    document.getElementById('black_player').classList.remove('input-error');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.remove('visible');
+    }
+    const whiteInput = document.getElementById('white_player');
+    const blackInput = document.getElementById('black_player');
+    if (whiteInput) whiteInput.classList.remove('input-error');
+    if (blackInput) blackInput.classList.remove('input-error');
 }
 
 /*
@@ -550,27 +628,39 @@ function clearStartError() {
  * and redirects to the game page on success.
  */
 function startGame() {
-    const whitePlayer = document.getElementById("white_player").value.trim();
     const startButton = document.getElementById("start_button");
     const selectedMode = document.querySelector("input[name='game_mode']:checked").value;
 
     clearStartError();
 
     let payload = {};
+
     if (selectedMode === 'two_player') {
+        // Player vs Player mode
+        const whitePlayer = document.getElementById("white_player").value.trim();
         const blackPlayer = document.getElementById("black_player").value.trim();
         if (!whitePlayer || !blackPlayer) {
             showStartError("Please enter names for both players.");
             return;
         }
-        payload = { player_white: whitePlayer, player_black: blackPlayer, game_mode: 'player_vs_player' };
+        payload = {
+            player_white: whitePlayer,
+            player_black: blackPlayer,
+            game_mode: 'player_vs_player'
+        };
     } else { // 'single_player'
+        // Player vs AI mode
+        const whitePlayer = document.getElementById("white_player").value.trim();
         const aiDifficulty = document.getElementById("ai_difficulty").value;
         if (!whitePlayer) {
             showStartError("Please enter your name.");
             return;
         }
-        payload = { player_white: whitePlayer, player_black: `AI (${aiDifficulty})`, difficulty: aiDifficulty, game_mode: 'player_vs_ai' };
+        payload = {
+            player_white: whitePlayer,
+            difficulty: aiDifficulty,
+            game_mode: 'player_vs_ai'
+        };
     }
 
     startButton.disabled = true;
@@ -602,7 +692,10 @@ function startGame() {
  */
 async function triggerAIMove() {
     try {
-        const response = await fetch('/ai-move');
+        const response = await fetch('/ai-move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
         const data = await response.json();
         if (!response.ok) {
             throw new Error(data.error || 'AI failed to make a move.');
@@ -621,7 +714,9 @@ async function triggerAIMove() {
         showToast(error.message);
     } finally {
         // Always re-enable the board after the AI move is complete or an error occurs.
-        enableBoardInteraction();
+        if (gameState) {
+            enableBoardInteraction();
+        }
     }
 }
 

@@ -347,6 +347,28 @@ body {
     background-image: radial-gradient(circle, rgba(255, 0, 0, 0.6) 25%, transparent 60%);
 }
 
+/* Highlight for squares that are valid move destinations. */
+.square.possible-move-dot::after {
+    content: '';
+    position: absolute;
+    width: 30%;
+    height: 30%;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    /* Prevents the dot from interfering with clicks/drags. */
+    pointer-events: none;
+}
+
+.square.possible-move-capture {
+    cursor: pointer;
+}
+
+/* We will also add a subtle effect to the piece itself to make it look "targeted" */
+.possible-move-capture .piece {
+    /* A subtle circular shadow or glow can work well. Let's use a drop-shadow filter. */
+    filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.8));
+}
+
 
 /* --- Pieces & States --- */
 .piece {
@@ -358,6 +380,7 @@ body {
     z-index: 10;
     /* Adds depth to pieces. */
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: filter 0.2s;
 }
 
 /* Style for a piece while it's being dragged. */
