@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game</title>
+
+    <!-- Link to the main stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Link to the main JavaScript file -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</head>
+
+<!--
+    Block for page-specific content.  This allows child templates
+    to insert their content into this base layout.
+-->
+{% block content %}{% endblock %}
+
+</html>

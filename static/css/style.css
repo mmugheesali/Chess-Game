@@ -1,0 +1,592 @@
+/*
+==========================================================================
+    CHESS GAME STYLESHEET
+==========================================================================
+    - Table of Contents -
+
+    1.  Global & Reset Styles
+    2.  General Page Layout
+    3.  Starting Page Styles
+        - Container & Form
+        - Error States
+    4.  Main Game Layout
+        - Core Structure (Game Layout, Main Area, Sidebar)
+    5.  Player Info Panels
+    6.  Chessboard & Pieces
+        - Board Structure
+        - Squares & States (light, dark, selected, in-check)
+        - Pieces & States (dragging)
+        - Board Labels
+    7.  Sidebar Components
+        - Move History
+        - Game Controls
+    8.  Modals & Overlays
+        - Game Over Modal
+    9.  Toast Notifications
+        - Container & Styling
+        - Animations
+    10. Utility Classes
+    11. Responsive Design
+==========================================================================
+*/
+
+
+/*
+==========================================================================
+    1. Global & Reset Styles
+==========================================================================
+*/
+
+/*
+ * Universal box-sizing rule.
+ * This makes layout math more intuitive by including padding and border
+ * in the element's total width and height.
+ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/*
+==========================================================================
+    2. General Page Layout
+==========================================================================
+*/
+
+/*
+ * Sets base styles for the entire page.
+ * Uses Flexbox to center the main content vertically and horizontally.
+ */
+body {
+    margin: 0;
+    padding: 2em;
+    font-family: 'Segoe UI', sans-serif;
+    /* Light gray background for the page. */
+    background: #e0e0e0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Ensures the body takes up at least the full viewport height. */
+    min-height: 100vh;
+}
+
+/*
+==========================================================================
+    3. Starting Page Styles
+    - Styles for the initial view where players enter their names.
+==========================================================================
+*/
+
+/* --- Container & Form --- */
+
+/* The main white box that holds the starting page content. */
+#starting-page-body .container {
+    background: white;
+    padding: 2em;
+    border-radius: 16px;
+    /* Adds depth with a soft shadow. */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    border: 1px solid #ccc;
+}
+
+#starting-page-body h1 {
+    margin-bottom: 1em;
+    color: #333;
+}
+
+/* Styles for the player name input fields. */
+#starting-page-body input[type="text"] {
+    width: 100%;
+    padding: 0.8em;
+    margin: 0.5em 0;
+    border: 2px solid #aaa;
+    background-color: #eee;
+    border-radius: 10px;
+    font-size: 1em;
+}
+
+/* Styles for the "Start Game" button. */
+#starting-page-body button {
+    margin-top: 1em;
+    padding: 0.8em 2em;
+    font-size: 1em;
+    border: none;
+    background-color: #888;
+    color: #fff;
+    border-radius: 10px;
+    cursor: pointer;
+    /* Smooth color change on hover. */
+    transition: background-color 0.3s;
+}
+
+/* Hover effect for the button. */
+#starting-page-body button:hover {
+    background-color: #666;
+}
+
+/* --- Error States --- */
+
+/* Styles for the text that appears when an input is invalid. */
+.error-text {
+    /* A strong red for errors. */
+    color: #d00000;
+    font-weight: 500;
+    margin: 0.5em 0 0.2em;
+    /* Reserves space to prevent layout shift when the error appears. */
+    min-height: 1.2em;
+    line-height: 1.2em;
+    /* Starts invisible. */
+    opacity: 0;
+    /* Smooth fade-in effect. */
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Makes the error text visible when the 'visible' class is added via JS. */
+.error-text.visible {
+    opacity: 1;
+}
+
+/* Styles the input field itself when there is an error. */
+#starting-page-body input[type="text"].input-error {
+    border-color: #d00000;
+    /* A subtle reddish background to reinforce the error state. */
+    background-color: #fff0f0;
+}
+
+/*
+==========================================================================
+    4. Main Game Layout
+==========================================================================
+*/
+
+/* --- Core Structure --- */
+
+/* The main container for the game screen, establishing a two-column layout. */
+.game-layout {
+    display: flex;
+    /* Space between the board area and the sidebar. */
+    gap: 2em;
+    width: 100%;
+    max-width: 1000px;
+    padding: 2em;
+    background: #f7f7f7;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* The left column containing player info and the chessboard. */
+.main-game-area {
+    display: flex;
+    /* Stacks player-board-player vertically. */
+    flex-direction: column;
+    /* Allows this area to take up the remaining space. */
+    flex-grow: 1;
+}
+
+/* The right column for move history and controls. */
+.sidebar {
+    width: 280px;
+    /* Prevents the sidebar from shrinking. */
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #ebebeb;
+    padding: 1.5em;
+    border-radius: 8px;
+    max-height: 90vh;
+    /* Clips content, allows for internal scrolling. */
+    overflow: hidden;
+}
+
+.sidebar h3 {
+    margin-top: 0;
+    text-align: center;
+    color: #333;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 0.5em;
+    margin-bottom: 1em;
+}
+
+/*
+==========================================================================
+    5. Player Info Panels
+==========================================================================
+*/
+
+/* Styles for the panels displaying player names above and below the board. */
+.player-panel {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.75em 1em;
+    font-size: 1.2em;
+    font-weight: 500;
+    color: #444;
+}
+
+/* The small circle indicator for the current player's turn. */
+.turn-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    /* Invisible by default. */
+    background-color: transparent;
+    transition: background-color 0.3s;
+}
+
+/* Style for the active player's turn indicator. */
+.turn-indicator.active-turn {
+    /* Green for go/active. */
+    background-color: #6a994e;
+}
+
+/*
+==========================================================================
+    6. Chessboard & Pieces
+==========================================================================
+*/
+
+/* --- Board Structure --- */
+.board-container {
+    width: 100%;
+    max-width: 600px;
+    /* Center the board within the main game area. */
+    margin: 0 auto;
+}
+
+/* The main 8x8 grid for the chessboard. */
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 100%;
+    /* Maintains a perfect square shape. */
+    aspect-ratio: 1;
+    border: 4px solid #555;
+    /* Board is hidden initially until JS is ready. */
+    visibility: hidden;
+}
+
+/* Class added by JS to show the board once it's fully rendered. */
+.board.ready {
+    visibility: visible;
+}
+
+
+/* --- Squares & States --- */
+.square {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    /* Prevents text selection on squares. */
+    user-select: none;
+    transition: background-color 0.2s;
+}
+
+/* Light and dark square colors. */
+.light {
+    background: #f0d9b5;
+}
+
+.dark {
+    background: #b58863;
+}
+
+/* Highlight for the currently selected square. */
+.square.selected {
+    /* !important overrides hover/other states. */
+    background-color: #baca44 !important;
+}
+
+/* Special styling for a king in check. */
+.square.in-check {
+    /* A red radial gradient to highlight the king's square. */
+    background-image: radial-gradient(circle, rgba(255, 0, 0, 0.6) 25%, transparent 60%);
+    /* A fallback solid color. */
+    background-color: #ff7f7f;
+}
+
+/* Ensures the 'selected' style is still visible on a checked king. */
+.square.in-check.selected {
+    background-color: #baca44 !important;
+    background-image: radial-gradient(circle, rgba(255, 0, 0, 0.6) 25%, transparent 60%);
+}
+
+
+/* --- Pieces & States --- */
+.piece {
+    /* Responsive piece size based on viewport minimum dimension. */
+    font-size: 6.5vmin;
+    user-select: none;
+    cursor: grab;
+    position: relative;
+    z-index: 10;
+    /* Adds depth to pieces. */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Style for a piece while it's being dragged. */
+.piece.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+
+/* --- Board Labels (Rank and File) --- */
+.row-label,
+.column-label {
+    position: absolute;
+    font-weight: 600;
+    font-size: 0.8em;
+    /* Default color for dark squares. */
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Adjusts label color for light squares for better contrast. */
+.light .row-label,
+.light .column-label {
+    color: rgba(0, 0, 0, 0.4);
+}
+
+.row-label {
+    top: 2px;
+    left: 4px;
+}
+
+.column-label {
+    bottom: 2px;
+    right: 4px;
+}
+
+/*
+==========================================================================
+    7. Sidebar Components
+==========================================================================
+*/
+
+/* --- Move History --- */
+.move-history-container {
+    /* Takes up remaining vertical space in the sidebar. */
+    flex-grow: 1;
+    /* Makes the move list scrollable if it gets long. */
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    max-height: 100%;
+}
+
+.move-history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.move-history-table th,
+.move-history-table td {
+    padding: 0.5em;
+    text-align: center;
+}
+
+.move-history-table th {
+    background: #ddd;
+    /* Header stays at the top when scrolling the container. */
+    position: sticky;
+    top: 0;
+}
+
+.move-history-table tbody tr:nth-child(even) {
+    /* Alternating row color for readability. */
+    background: #f7f7f7;
+}
+
+
+/* --- Game Controls --- */
+.game-controls {
+    margin-top: 1em;
+    text-align: center;
+}
+
+/* Styles for buttons like "Resign Game". */
+.game-controls button {
+    width: 100%;
+    padding: 0.8em;
+    font-size: 1em;
+    border: none;
+    background-color: #888;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.game-controls button:hover {
+    background-color: #666;
+}
+
+/*
+==========================================================================
+    8. Modals & Overlays
+==========================================================================
+*/
+
+/* --- Game Over Modal --- */
+
+/* Semi-transparent black background overlay for modals. */
+#modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    /* Sits on top of all page content. */
+    z-index: 1000;
+}
+
+/* The modal window that appears at the end of the game. */
+#game-over-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    /* Centers the modal perfectly. */
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 2em 3em;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    /* Sits on top of the overlay. */
+    z-index: 1001;
+    text-align: center;
+    min-width: 300px;
+}
+
+#game-over-modal h2 {
+    margin-top: 0;
+    color: #333;
+}
+
+#game-over-modal p {
+    font-size: 1.2em;
+    margin: 1em 0 1.5em;
+}
+
+/* "Play Again" button in the modal. */
+#game-over-modal button {
+    font-size: 1em;
+    padding: 0.7em 2em;
+    background-color: #6a994e;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#game-over-modal button:hover {
+    background-color: #588142;
+}
+
+
+/*
+==========================================================================
+    9. Toast Notifications
+    - Small pop-up messages for alerts like "Invalid move".
+==========================================================================
+*/
+
+/* --- Container & Styling --- */
+
+/* Container for toast notifications, positioned at the bottom-right of the screen. */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    /* Sits on top of everything, including modals. */
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Individual toast message styling. */
+.toast {
+    padding: 12px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: translateX(100%);
+    /* Animation: slide in, wait 3s, then fade out. */
+    animation: slideIn 0.5s forwards, fadeOut 0.5s 3.5s forwards;
+}
+
+.toast.error {
+    /* A strong red for error toasts. */
+    background-color: #d00000;
+}
+
+/* --- Animations --- */
+/* Keyframes to slide the toast in from the right. */
+@keyframes slideIn {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Keyframes to fade and slide the toast out to the right. */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/*
+==========================================================================
+    10. Utility Classes
+==========================================================================
+*/
+
+/* A simple helper class to hide elements completely. */
+.hidden {
+    display: none;
+}
+
+
+/*
+==========================================================================
+    11. Responsive Design
+==========================================================================
+*/
+
+@media (max-width: 900px) {
+    body {
+        padding: 1em;
+    }
+
+    /* Stacks the sidebar below the board on smaller screens. */
+    .game-layout {
+        flex-direction: column;
+        padding: 1em;
+        gap: 1em;
+    }
+
+    /* Sidebar takes full width and has a max height on small screens. */
+    .sidebar {
+        width: 100%;
+        max-height: 350px;
+    }
+}
