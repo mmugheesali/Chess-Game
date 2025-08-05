@@ -1,3 +1,12 @@
+/**
+ * @file Client-side JavaScript for a web-based chess game.
+ * @description This script handles all user interactions, communicates with the
+ * backend server via the Fetch API, and dynamically renders the game state. It manages
+ * two primary pages: a starting page for game setup and the main game page. The script
+ * is event-driven, responding to user actions like clicks and drag-and-drop to play
+ * the game.
+ */
+
 /*
 ==========================================================================
     CHESS GAME CLIENT-SIDE SCRIPT
@@ -28,27 +37,37 @@
 */
 
 /**
- * @type {HTMLElement|null}
  * Stores a reference to the DOM element of the currently selected square.
+ * This is used for the click-to-move interaction model.
+ * @type {HTMLElement | null}
  */
 let selectedSquare = null;
 
 /**
- * @type {HTMLElement|null}
  * Stores a reference to the DOM element of the piece being dragged.
+ * This is used for the drag-and-drop interaction model.
+ * @type {HTMLElement | null}
  */
 let draggedPiece = null;
 
 /**
- * @type {object|null}
- * Stores the entire game state received from the server, including the board,
- * turn, players, move history, and game status.
+ * Stores the entire game state received from the server. This object is the
+ * single source of truth for rendering the UI.
+ * @type {object | null}
+ * @property {string[][]} board - 8x8 grid of piece symbols.
+ * @property {string} turn - The color of the current player ('white' or 'black').
+ * @property {object} players - Names of the white and black players.
+ * @property {string[][]} move_history - List of moves in algebraic notation.
+ * @property {string} status - Current game status ('active', 'checkmate', etc.).
+ * @property {string | null} winner - The winning color, if any.
+ * @property {string | null} is_check - The color of the king in check, if any.
+ * @property {string} game_mode - The mode of the game ('player_vs_player' or 'player_vs_ai').
  */
 let gameState = null;
 
 /**
+ * Pre-loads the sound effect for a piece move to ensure it plays instantly on user action.
  * @const {Audio}
- * Pre-loads the sound effect for a piece move to ensure it plays instantly.
  */
 const moveSound = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3');
 moveSound.volume = 1; // Volume can be adjusted from 0.0 to 1.0
@@ -61,32 +80,16 @@ moveSound.volume = 1; // Volume can be adjusted from 0.0 to 1.0
 */
 
 /**
- * Entry point for the script. Runs after the DOM is fully loaded.
- * Acts as a router to set up event listeners based on which page is currently loaded.
+ * Main entry point for the script. Runs after the DOM is fully loaded.
+ * It identifies the current page and calls the appropriate setup function.
  */
 document.addEventListener("DOMContentLoaded", function () {
     const pageId = document.body.id;
 
-    // --- Logic for the Starting Page ---
     if (pageId === "starting-page-body") {
-        const startButton = document.getElementById("start_button");
-        const whiteInput = document.getElementById("white_player");
-        const blackInput = document.getElementById("black_player");
-
-        if (startButton) {
-            startButton.addEventListener("click", startGame);
-        }
-        // Allow pressing 'Enter' in input fields to start the game
-        whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-        blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
-
-        // Clear error messages when the user starts typing
-        whiteInput.addEventListener('input', clearStartError);
-        blackInput.addEventListener('input', clearStartError);
-    }
-    // --- Logic for the Main Chess Game Page ---
-    else if (pageId === "chess-body") {
-        initializeBoard(); // Fetches state and sets up the game
+        setupStartingPageListeners();
+    } else if (pageId === "chess-body") {
+        initializeBoard();
         const endButton = document.getElementById("end_button");
         if (endButton) {
             endButton.addEventListener("click", endGame);
@@ -95,13 +98,66 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 /**
- * Initializes the game board by fetching the initial state, setting up
- * event listeners for the squares, and making the board visible.
+ * Initializes the game board on the main chess page. It fetches the initial game
+ * state, sets up event listeners for all squares, and makes the board visible.
+ * @async
  */
 async function initializeBoard() {
-    await updateGameState(); // Fetch initial state and render
-    setupSquareEventListeners(); // Add interactivity to squares
-    document.querySelector(".board").classList.add("ready"); // Show board to prevent FOUC
+    await updateGameState();      // Fetch initial state and render the UI.
+    setupSquareEventListeners();  // Add click and drag-and-drop listeners.
+    document.querySelector(".board").classList.add("ready"); // Show board to prevent Flash of Unstyled Content (FOUC).
+}
+
+/**
+ * Sets up all necessary event listeners for the starting page, including the start
+ * button, player name inputs, and game mode selection radios.
+ */
+function setupStartingPageListeners() {
+    const startButton = document.getElementById("start_button");
+    const whiteInput = document.getElementById("white_player");
+    const blackInput = document.getElementById("black_player");
+    const gameModeRadios = document.querySelectorAll('input[name="game_mode"]');
+
+    if (startButton) {
+        startButton.addEventListener("click", startGame);
+    }
+    // Allow pressing 'Enter' in input fields to trigger the start game action.
+    if (whiteInput) {
+        whiteInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+        whiteInput.addEventListener('input', clearStartError);
+    }
+    if (blackInput) {
+        blackInput.addEventListener("keyup", (e) => { if (e.key === "Enter") startGame(); });
+        blackInput.addEventListener('input', clearStartError);
+    }
+
+    gameModeRadios.forEach(radio => {
+        radio.addEventListener('change', handleGameModeChange);
+    });
+}
+
+/**
+ * Handles the UI changes when the game mode is switched.
+ * It shows or hides the appropriate input fields based on the selected mode.
+ */
+function handleGameModeChange() {
+    const selectedMode = document.querySelector('input[name="game_mode"]:checked').value;
+    const blackPlayerInput = document.getElementById('black_player_input_container');
+    const aiDifficultySelect = document.getElementById('ai_difficulty_container');
+    const whitePlayerInput = document.getElementById('white_player_input_container');
+
+    if (selectedMode === 'single_player') {
+        // Player vs AI mode - show white player input and AI difficulty
+        if (whitePlayerInput) whitePlayerInput.classList.remove('hidden');
+        if (blackPlayerInput) blackPlayerInput.classList.add('hidden');
+        if (aiDifficultySelect) aiDifficultySelect.classList.remove('hidden');
+    } else { // two_player
+        // Player vs Player mode - show both player inputs
+        if (whitePlayerInput) whitePlayerInput.classList.remove('hidden');
+        if (blackPlayerInput) blackPlayerInput.classList.remove('hidden');
+        if (aiDifficultySelect) aiDifficultySelect.classList.add('hidden');
+    }
+    clearStartError(); // Clear any validation errors when the mode changes.
 }
 
 
@@ -112,9 +168,10 @@ async function initializeBoard() {
 */
 
 /**
- * Fetches the latest game state from the server's /state endpoint.
- * On success, it updates the global gameState and triggers rendering functions.
- * On failure, it logs and shows a toast with the error.
+ * Fetches the latest game state from the server's `/state` endpoint.
+ * On success, it updates the global `gameState` and triggers rendering functions.
+ * On failure, it logs the error and displays a user-friendly toast notification.
+ * @async
  */
 async function updateGameState() {
     try {
@@ -133,15 +190,17 @@ async function updateGameState() {
 }
 
 /**
- * Attempts to make a move by sending the 'from' and 'to' squares to the server.
- * - On success: Plays a sound and updates the UI with the new state from the server.
+ * Attempts to make a move by sending the 'from' and 'to' squares to the server's `/move` endpoint.
+ * - On success: Plays a sound, updates the UI with the new state, and checks for game over.
+ *               If in an AI game, it may trigger the AI's turn.
  * - On failure: Shows a toast notification with the error and re-renders the last known
- *   good state to revert any visual changes.
+ *               valid state to revert any optimistic UI changes.
+ * @async
  * @param {string} fromSqId - The ID of the source square (e.g., "e2").
  * @param {string} toSqId - The ID of the destination square (e.g., "e4").
  */
 async function attemptMove(fromSqId, toSqId) {
-    clearSelection(); // Clear visual selection immediately
+    clearSelection(); // Clear visual selection immediately for responsiveness.
     try {
         const response = await fetch('/move', {
             method: 'POST',
@@ -153,20 +212,19 @@ async function attemptMove(fromSqId, toSqId) {
             throw new Error(data.error || 'Invalid move');
         }
 
-        // --- Play sound and update UI on a successful move ---
+        // --- Handle successful move ---
         moveSound.play().catch(e => console.error("Error playing sound:", e));
         gameState = data.state;
         renderBoard(gameState);
         renderGameInfo(gameState);
 
-        // Check for game over conditions
         if (gameState.status === 'checkmate' || gameState.status === 'stalemate') {
             showGameOverModal(gameState.status, gameState.winner);
         }
 
     } catch (error) {
         showToast(error.message);
-        // If move failed, re-render the last known good state to reset piece positions.
+        // If the move failed on the server, revert the board to the last valid state.
         if (gameState) {
             renderBoard(gameState);
             renderGameInfo(gameState);
@@ -181,22 +239,23 @@ async function attemptMove(fromSqId, toSqId) {
 */
 
 /**
- * Renders the chessboard based on the provided state object.
- * It clears the board, places pieces, and highlights the king if in check.
- * @param {object} state - The gameState object from the server.
+ * Renders the entire chessboard based on the provided state object. It clears
+ * the board, places pieces with their correct unicode symbols and colors,
+ * and highlights the king if it is in check.
+ * @param {object} state - The `gameState` object from the server.
  */
 function renderBoard(state) {
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
     const PIECE_UNICODE = {
-        'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', // Black pieces
-        'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'  // White pieces
+        'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', // Black
+        'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'  // White
     };
 
     // Clear previous highlights and pieces before redrawing.
     document.querySelectorAll('.square.in-check').forEach(sq => sq.classList.remove('in-check'));
     document.querySelectorAll('.piece').forEach(p => p.remove());
 
-    // Place pieces on the board based on the 2D array from the server state.
+    // Place pieces based on the 2D array from the server state.
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const pieceSymbol = state.board[row][col];
@@ -211,24 +270,25 @@ function renderBoard(state) {
                 pieceEl.className = `piece ${pieceColor}`;
                 pieceEl.textContent = PIECE_UNICODE[pieceSymbol];
 
-                // A piece is only draggable if it is that player's turn.
-                if (pieceColor === state.turn) {
-                    pieceEl.draggable = true;
-                }
+                // Only make pieces draggable for human players in their turn
+                const isHumanTurn = (state.game_mode === 'player_vs_player') ||
+                    (state.game_mode === 'player_vs_ai' && state.turn === 'white');
+                pieceEl.draggable = isHumanTurn && (pieceColor === state.turn);
+
                 square.appendChild(pieceEl);
             }
         }
     }
 
-    // After drawing all pieces, find and highlight the checked king.
+    // Highlight the king if in check.
     if (state.is_check) {
         const kingSymbol = (state.is_check === 'white') ? 'K' : 'k';
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 if (state.board[r][c] === kingSymbol) {
                     const kingSquareId = files[c] + (r + 1);
-                    document.getElementById(kingSquareId).classList.add('in-check');
-                    return; // King found and highlighted, exit.
+                    document.getElementById(kingSquareId)?.classList.add('in-check');
+                    return; // King found, exit loop.
                 }
             }
         }
@@ -236,22 +296,20 @@ function renderBoard(state) {
 }
 
 /**
- * Renders all game information outside the board, such as player names,
+ * Renders all game information displayed outside the board, such as player names,
  * turn indicators, and the move history table.
- * @param {object} state - The gameState object from the server.
+ * @param {object} state - The `gameState` object from the server.
  */
 function renderGameInfo(state) {
-    // Update player names
     document.getElementById('white-player-name').textContent = state.players.white || 'White Player';
     document.getElementById('black-player-name').textContent = state.players.black || 'Black Player';
 
-    // Update turn indicators
     document.getElementById('white-turn-indicator').classList.toggle('active-turn', state.turn === 'white');
     document.getElementById('black-turn-indicator').classList.toggle('active-turn', state.turn === 'black');
 
-    // Re-render move history table
+    // Re-render move history.
     const historyBody = document.getElementById('move-history-body');
-    historyBody.innerHTML = ''; // Clear old history
+    historyBody.innerHTML = ''; // Clear old history.
 
     for (let i = 0; i < state.move_history.length; i += 2) {
         const moveNumber = i / 2 + 1;
@@ -263,9 +321,20 @@ function renderGameInfo(state) {
         historyBody.appendChild(row);
     }
 
-    // Auto-scroll the move history to show the latest move
+    // Auto-scroll move history to show the latest move.
     const historyContainer = document.querySelector('.move-history-container');
     historyContainer.scrollTop = historyContainer.scrollHeight;
+
+    // --- Trigger AI moves based on game mode ---
+    if (state.game_mode === 'player_vs_ai' && state.turn === 'black') {
+        // In Player vs AI mode, trigger AI move when it's black's turn
+        disableBoardInteraction();
+        setTimeout(triggerAIMove, 700); // Small delay for better UX.
+    } else if (state.game_mode === 'player_vs_player' ||
+        (state.game_mode === 'player_vs_ai' && state.turn === 'white')) {
+        // Enable board interaction for human players
+        enableBoardInteraction();
+    }
 }
 
 
@@ -294,25 +363,37 @@ function setupSquareEventListeners() {
 // --- Click Handling ---
 
 /**
- * Handles a click event on a square.
- * - If no square is selected, it selects the clicked square if it contains a valid piece.
- * - If a square is already selected, it attempts to move the piece to the clicked square.
- * @param {Event} event - The click event.
+ * Handles a click event on a square for the click-to-move mechanic.
+ * Only processes clicks for human players in appropriate game modes.
+ * @param {Event} event - The click event object.
  */
-function handleClick(event) {
+async function handleClick(event) {
+    // Don't handle clicks when it's AI's turn
+    if (gameState.game_mode === 'player_vs_ai' && gameState.turn === 'black') return;
+
     const clickedSquare = event.currentTarget;
     const piece = clickedSquare.querySelector('.piece');
 
-    if (selectedSquare) { // This is the second click (destination)
+    if (selectedSquare) {
         if (clickedSquare.id === selectedSquare.id) {
-            clearSelection(); // Clicked the same square, so deselect it.
+            clearSelection();
             return;
         }
-        attemptMove(selectedSquare.id, clickedSquare.id);
-    } else if (piece) { // This is the first click (source)
+        // Check if the destination is a valid possible move before attempting
+        if (clickedSquare.classList.contains('possible-move-dot') || clickedSquare.classList.contains('possible-move-capture')) {
+            await attemptMove(selectedSquare.id, clickedSquare.id);
+        } else {
+            // If an invalid square is clicked, deselect and re-select if it's another of our pieces
+            const isOurPiece = piece && (piece.classList.contains(gameState.turn));
+            clearSelection();
+            if (isOurPiece) {
+                await selectSquare(clickedSquare); // Re-select the new piece
+            }
+        }
+    } else if (piece) {
         const pieceColor = piece.classList.contains('white') ? 'white' : 'black';
         if (pieceColor === gameState.turn) {
-            selectSquare(clickedSquare);
+            await selectSquare(clickedSquare); // Select the square
         }
     }
 }
@@ -320,32 +401,39 @@ function handleClick(event) {
 // --- Drag & Drop Handling ---
 
 /**
- * Handles the start of a drag operation on a piece.
+ * Handles the `dragstart` event when a user begins dragging a piece.
+ * Only allows dragging for human players in appropriate game modes.
  * @param {DragEvent} event
  */
 function handleDragStart(event) {
+    // Don't allow dragging when it's AI's turn
+    if (gameState.game_mode === 'player_vs_ai' && gameState.turn === 'black') {
+        event.preventDefault();
+        return;
+    }
+
     const piece = event.target;
     if (piece.classList.contains('piece')) {
         draggedPiece = piece;
         event.dataTransfer.setData('text/plain', piece.parentElement.id);
         event.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => piece.classList.add('dragging'), 0); // Add class for styling
+        setTimeout(() => piece.classList.add('dragging'), 0); // Style the piece being dragged.
     } else {
-        event.preventDefault(); // Don't allow dragging the square itself
+        event.preventDefault(); // Prevent dragging the square itself.
     }
 }
 
 /**
- * Allows a square to be a valid drop target.
+ * Handles the `dragover` event, allowing a square to be a valid drop target.
  * @param {DragEvent} event
  */
 function handleDragOver(event) {
-    event.preventDefault(); // Necessary to allow a drop
+    event.preventDefault(); // This is necessary to allow a 'drop' event.
     event.dataTransfer.dropEffect = 'move';
 }
 
 /**
- * Handles the drop event on a square, attempting a move.
+ * Handles the `drop` event on a target square, triggering a move attempt.
  * @param {DragEvent} event
  */
 function handleDrop(event) {
@@ -360,7 +448,7 @@ function handleDrop(event) {
 }
 
 /**
- * Cleans up after a drag operation is finished (either dropped or cancelled).
+ * Handles the `dragend` event, cleaning up styles and state after a drag operation finishes.
  */
 function handleDragEnd() {
     if (draggedPiece) {
@@ -378,32 +466,84 @@ function handleDragEnd() {
 // --- Board Interaction ---
 
 /**
- * Visually selects a square by adding the 'selected' class.
- * @param {HTMLElement} square - The square element to select.
+ * Visually selects a square by adding the 'selected' CSS class.
+ * @param {HTMLElement} square - The DOM element of the square to select.
  */
-function selectSquare(square) {
+async function selectSquare(square) {
     clearSelection();
     selectedSquare = square;
     square.classList.add('selected');
+
+    try {
+        const response = await fetch(`/possible-moves?square=${square.id}`);
+        if (!response.ok) throw new Error('Failed to fetch moves.');
+
+        const data = await response.json();
+        highlightPossibleMoves(data.possible_moves);
+
+    } catch (error) {
+        console.error("Error fetching possible moves:", error);
+        showToast(error.message);
+    }
 }
 
 /**
- * Clears any existing square selection and resets the global variable.
+ * Clears any existing visual selection from a square and resets the global variable.
  */
 function clearSelection() {
-    const selected = document.querySelector('.square.selected');
-    if (selected) {
-        selected.classList.remove('selected');
+    if (selectedSquare) {
+        selectedSquare.classList.remove('selected');
     }
     selectedSquare = null;
+    // Remove all possible-move highlight classes
+    document.querySelectorAll('.possible-move-dot, .possible-move-capture').forEach(sq => {
+        sq.classList.remove('possible-move-dot');
+        sq.classList.remove('possible-move-capture');
+    });
+}
+
+/**
+ * Adds the 'possible-move' class to all squares in the provided list.
+ * @param {string[]} moves - A list of square IDs in algebraic notation (e.g., ['e3', 'e4']).
+ */
+function highlightPossibleMoves(moves) {
+    moves.forEach(moveId => {
+        const square = document.getElementById(moveId);
+        if (square) {
+            // Check if the square contains a piece
+            if (square.querySelector('.piece')) {
+                // It's a capture!
+                square.classList.add('possible-move-capture');
+            } else {
+                // It's an empty square.
+                square.classList.add('possible-move-dot');
+            }
+
+        }
+    });
+}
+
+/**
+ * Disables user interaction with the board by adding a 'disabled' class.
+ * This is used to prevent input while the AI is "thinking".
+ */
+function disableBoardInteraction() {
+    document.querySelector('.board-container').classList.add('disabled');
+}
+
+/**
+ * Re-enables user interaction with the board by removing the 'disabled' class.
+ */
+function enableBoardInteraction() {
+    document.querySelector('.board-container').classList.remove('disabled');
 }
 
 // --- Notifications & Modals ---
 
 /**
- * Displays a short-lived toast notification at the bottom-right of the screen.
+ * Displays a short-lived "toast" notification at the bottom-right of the screen.
  * @param {string} message - The message to display in the toast.
- * @param {string} [type='error'] - The type of toast (e.g., 'error'), used for styling.
+ * @param {string} [type='error'] - The type of toast ('error', 'success', 'info'), used for styling.
  */
 function showToast(message, type = 'error') {
     const container = document.getElementById('toast-container');
@@ -412,12 +552,12 @@ function showToast(message, type = 'error') {
     toast.textContent = message;
     container.appendChild(toast);
 
-    // Toast removes itself after CSS animation completes (4s total duration).
+    // Toast removes itself after the CSS animation completes (4s total duration).
     setTimeout(() => toast.remove(), 4000);
 }
 
 /**
- * Displays the game over modal with a specific message.
+ * Displays the game-over modal with a message indicating the result.
  * @param {string} status - The game status ('checkmate' or 'stalemate').
  * @param {string|null} winner - The winning color ('white' or 'black'), if any.
  */
@@ -443,28 +583,37 @@ function showGameOverModal(status, winner) {
 // --- Starting Page Errors ---
 
 /**
- * Displays an error message on the starting page and highlights empty input fields.
+ * Displays a validation error message on the starting page and highlights empty input fields.
  * @param {string} message - The error message to show.
  */
 function showStartError(message) {
     const errorEl = document.getElementById('start_error_message');
     const whiteInput = document.getElementById('white_player');
     const blackInput = document.getElementById('black_player');
+    const selectedMode = document.querySelector('input[name="game_mode"]:checked').value;
 
     errorEl.textContent = message;
     errorEl.classList.add('visible');
 
-    if (!whiteInput.value.trim()) whiteInput.classList.add('input-error');
-    if (!blackInput.value.trim()) blackInput.classList.add('input-error');
+    if (whiteInput && !whiteInput.value.trim()) whiteInput.classList.add('input-error');
+    if (selectedMode === 'two_player' && blackInput && !blackInput.value.trim()) {
+        blackInput.classList.add('input-error');
+    }
 }
 
 /**
- * Clears any visible error messages and input highlighting on the starting page.
+ * Clears any visible validation error messages and input highlighting on the starting page.
  */
 function clearStartError() {
-    document.getElementById('start_error_message').classList.remove('visible');
-    document.getElementById('white_player').classList.remove('input-error');
-    document.getElementById('black_player').classList.remove('input-error');
+    const errorEl = document.getElementById('start_error_message');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.remove('visible');
+    }
+    const whiteInput = document.getElementById('white_player');
+    const blackInput = document.getElementById('black_player');
+    if (whiteInput) whiteInput.classList.remove('input-error');
+    if (blackInput) blackInput.classList.remove('input-error');
 }
 
 /*
@@ -474,49 +623,107 @@ function clearStartError() {
 */
 
 /**
- * Handles the logic for starting a new game from the starting page.
- * It validates input, sends player names to the server, and redirects to the game.
+ * Handles the logic for starting a new game from the setup page. It validates
+ * inputs, constructs a payload, sends it to the server's `/start` endpoint,
+ * and redirects to the game page on success.
  */
 function startGame() {
-    const whitePlayer = document.getElementById("white_player").value.trim();
-    const blackPlayer = document.getElementById("black_player").value.trim();
     const startButton = document.getElementById("start_button");
+    const selectedMode = document.querySelector("input[name='game_mode']:checked").value;
 
     clearStartError();
 
-    if (!whitePlayer || !blackPlayer) {
-        showStartError("Please enter names for both players.");
-        return;
+    let payload = {};
+
+    if (selectedMode === 'two_player') {
+        // Player vs Player mode
+        const whitePlayer = document.getElementById("white_player").value.trim();
+        const blackPlayer = document.getElementById("black_player").value.trim();
+        if (!whitePlayer || !blackPlayer) {
+            showStartError("Please enter names for both players.");
+            return;
+        }
+        payload = {
+            player_white: whitePlayer,
+            player_black: blackPlayer,
+            game_mode: 'player_vs_player'
+        };
+    } else { // 'single_player'
+        // Player vs AI mode
+        const whitePlayer = document.getElementById("white_player").value.trim();
+        const aiDifficulty = document.getElementById("ai_difficulty").value;
+        if (!whitePlayer) {
+            showStartError("Please enter your name.");
+            return;
+        }
+        payload = {
+            player_white: whitePlayer,
+            difficulty: aiDifficulty,
+            game_mode: 'player_vs_ai'
+        };
     }
 
-    // Disable button to prevent multiple clicks
     startButton.disabled = true;
     startButton.textContent = "Starting...";
 
     fetch("/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_white: whitePlayer, player_black: blackPlayer })
+        body: JSON.stringify(payload)
     })
-        .then(async (response) => {
-            const data = await response.json();
+        .then(response => {
             if (response.ok) {
-                window.location.href = "/play"; // Redirect to game page on success
+                window.location.href = "/play"; // Redirect to game page on success.
             } else {
-                throw new Error(data.error || "Unknown error");
+                return response.json().then(data => { throw new Error(data.error || "Unknown server error"); });
             }
         })
         .catch(error => {
-            showStartError("Error: " + error.message);
-            // Re-enable button on failure
+            showStartError(error.message);
             startButton.disabled = false;
             startButton.textContent = "Start Game";
         });
 }
 
 /**
- * Handles the logic for ending a game and returning to the starting page.
- * It calls the /end endpoint on the server and redirects on success.
+ * Triggers the AI move by calling the `/ai-move` endpoint, then updates the UI
+ * with the new game state returned by the server.
+ * @async
+ */
+async function triggerAIMove() {
+    try {
+        const response = await fetch('/ai-move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'AI failed to make a move.');
+        }
+
+        moveSound.play().catch(e => console.error("Error playing sound:", e));
+        gameState = data.state;
+        renderBoard(gameState);
+        renderGameInfo(gameState);
+
+        if (gameState.status === 'checkmate' || gameState.status === 'stalemate') {
+            showGameOverModal(gameState.status, gameState.winner);
+        }
+
+    } catch (error) {
+        showToast(error.message);
+    } finally {
+        // Always re-enable the board after the AI move is complete or an error occurs.
+        if (gameState) {
+            enableBoardInteraction();
+        }
+    }
+}
+
+/**
+ * Handles ending the current game. It calls the `/end` endpoint on the server
+ * and redirects the user back to the starting page on success.
+ * @async
  */
 async function endGame() {
     const endButton = document.getElementById("end_button");
@@ -527,12 +734,12 @@ async function endGame() {
         const response = await fetch("/end");
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || "Failed to end game.");
+            throw new Error(errorData.error || "Failed to end the game.");
         }
-        window.location.href = "/"; // Redirect to home/starting page
+        window.location.href = "/"; // Redirect to home/starting page.
     } catch (error) {
         showToast("Error: " + error.message);
         endButton.disabled = false;
-        endButton.textContent = "New Game"; // Reset button text on failure
+        endButton.textContent = "New Game"; // Reset button text on failure.
     }
 }

@@ -12,14 +12,37 @@
     <div class="container">
         <h1>Start Chess Game</h1>
 
-        <!-- Input field for the white player's name. -->
-        <input type="text" id="white_player" placeholder="White Player's Name" />
+        <div id="game-mode-selection">
+            <label>
+                <input type="radio" name="game_mode" value="two_player" checked> Two Players
+            </label>
+            <label>
+                <input type="radio" name="game_mode" value="single_player"> Single Player (vs AI)
+            </label>
+        </div>
 
-        <!-- Input field for the black player's name. -->
-        <input type="text" id="black_player" placeholder="Black Player's Name" />
+        <!-- Container for the white player's input, shown for player modes -->
+        <div id="white_player_input_container">
+            <input type="text" id="white_player" placeholder="White Player's Name" />
+        </div>
+
+        <!-- Container for the second player's input, shown for two-player mode -->
+        <div id="black_player_input_container">
+            <input type="text" id="black_player" placeholder="Black Player's Name" />
+        </div>
+
+        <!-- Container for the AI difficulty, shown for single-player mode -->
+        <div id="ai_difficulty_container" class="hidden">
+            <label for="ai_difficulty">AI Difficulty:</label>
+            <select id="ai_difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
 
         <!-- This paragraph element is used to display validation errors, such as missing player names. -->
-        <p id="start_error_message" class="error_text"></p>
+        <p id="start_error_message" class="error_text" opacity="0"></p>
 
         <!-- The button that initiates the game start process. -->
         <button id="start_button">Start Game</button>

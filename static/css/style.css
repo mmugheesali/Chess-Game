@@ -128,6 +128,34 @@ body {
     background-color: #666;
 }
 
+#game-mode-selection {
+    margin-bottom: 1em;
+    display: flex;
+    justify-content: center;
+    gap: 1.5em;
+    color: #555;
+}
+
+/* Styles for the player name input fields and AI difficulty dropdown. */
+#starting-page-body input[type="text"],
+#starting-page-body select {
+    width: 100%;
+    padding: 0.8em;
+    margin: 0.5em 0;
+    border: 2px solid #aaa;
+    background-color: #eee;
+    border-radius: 10px;
+    font-size: 1em;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+#game-mode-selection label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
 /* --- Error States --- */
 
 /* Styles for the text that appears when an input is invalid. */
@@ -319,6 +347,28 @@ body {
     background-image: radial-gradient(circle, rgba(255, 0, 0, 0.6) 25%, transparent 60%);
 }
 
+/* Highlight for squares that are valid move destinations. */
+.square.possible-move-dot::after {
+    content: '';
+    position: absolute;
+    width: 30%;
+    height: 30%;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    /* Prevents the dot from interfering with clicks/drags. */
+    pointer-events: none;
+}
+
+.square.possible-move-capture {
+    cursor: pointer;
+}
+
+/* We will also add a subtle effect to the piece itself to make it look "targeted" */
+.possible-move-capture .piece {
+    /* A subtle circular shadow or glow can work well. Let's use a drop-shadow filter. */
+    filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.8));
+}
+
 
 /* --- Pieces & States --- */
 .piece {
@@ -330,6 +380,7 @@ body {
     z-index: 10;
     /* Adds depth to pieces. */
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: filter 0.2s;
 }
 
 /* Style for a piece while it's being dragged. */
@@ -562,9 +613,13 @@ body {
 
 /* A simple helper class to hide elements completely. */
 .hidden {
-    display: none;
+    display: none !important;
 }
 
+.disabled {
+    pointer-events: none;
+    opacity: 0.5;
+}
 
 /*
 ==========================================================================

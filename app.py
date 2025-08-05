@@ -1,20 +1,35 @@
+"""
+app.py - Flask backend for Chess Game
+
+This module provides the server-side logic for a web-based chess game.
+It manages the game state, player actions, AI moves, leaderboard, and file I/O.
+
+Key Features:
+- RESTful API endpoints for game control, moves, state, leaderboard, save/load
+- In-memory and file-based persistence for game state and leaderboard
+- Handles both player-vs-player and player-vs-AI modes
+- Uses models.py for chess logic and data structures
+"""
+
 import os
 import json
 import csv
 from flask import Flask, request, jsonify, render_template, url_for, redirect
-from models import Game, Difficulty, Piece, PieceColor, Pawn, Rook, Knight, Bishop, Queen, King
+from models import Game, Difficulty, PieceColor, Pawn, Rook, Knight, Bishop, Queen, King, GameMode
 
 app = Flask(__name__)
 
 # --- File Configuration ---
-GAME_STATE_FILE = "data/games.json"
-LEADERBOARD_FILE = "data/leaderboard.csv"
+GAME_STATE_FILE = "data/games.json"  # Path to the file for saving/loading game state.
+LEADERBOARD_FILE = "data/leaderboard.csv"  # Path to the CSV file for storing player leaderboard data.
 
 # In-memory game object, which will be synced with the file system.
+# This global object holds the state of the currently active game.
 game = Game()
 
 # --- Mapping for Deserialization ---
 # Maps character symbols back to their corresponding Piece classes and colors.
+# This is used when loading a game state from a file or another serialized format.
 PIECE_MAP = {
     "p": (Pawn, PieceColor.BLACK),
     "r": (Rook, PieceColor.BLACK),
@@ -34,7 +49,14 @@ PIECE_MAP = {
 
 
 def get_current_state_json():
-    """Gets the current game state and formats it for a JSON response."""
+    """Gets the current game state and formats it for a JSON response.
+
+    If no game has been started, it returns an error dictionary. Otherwise,
+    it calls the `get_game_state` method on the global `game` object.
+
+    Returns:
+        dict: A dictionary representing the current game state or an error message.
+    """
     if game.game_status == "not_started":
         return {"error": "Game not started. Please POST to /start first."}
 
@@ -43,7 +65,16 @@ def get_current_state_json():
 
 
 def update_leaderboard(winner_name, loser_name):
-    """Reads, updates, and writes the leaderboard CSV file."""
+    """Reads, updates, and writes the leaderboard CSV file.
+
+    This function is called when a game ends in a checkmate. It updates the win/loss
+    records for the specified players. If a player is not already in the
+    leaderboard, they are added.
+
+    Args:
+        winner_name (str): The name of the winning player.
+        loser_name (str): The name of the losing player.
+    """
     records = []
     player_found = {"winner": False, "loser": False}
 
@@ -75,15 +106,23 @@ def update_leaderboard(winner_name, loser_name):
 
 
 def algebraic_to_tuple(pos: str) -> tuple[int, int]:
-    """
-    Converts algebraic chess notation (e.g., 'e4') to a tuple (row, column).
-    Returns (row, col) with 1-based indexing: 'a1' -> (1, 1), 'h8' -> (8, 8)
+    """Converts algebraic chess notation (e.g., 'e4') to a 0-indexed tuple.
+
+    Args:
+        pos (str): The algebraic notation string (e.g., 'a1', 'h8').
+
+    Returns:
+        tuple[int, int]: A 0-indexed (column, row) tuple. For example,
+                         'a1' becomes (0, 0) and 'h8' becomes (7, 7).
+
+    Raises:
+        ValueError: If the input string is not valid algebraic notation.
     """
     if len(pos) != 2 or pos[0] not in "abcdefgh" or pos[1] not in "12345678":
         raise ValueError(f"Invalid chess position: {pos}")
 
-    col = ord(pos[0]) - ord("a")  # 'a' → 0, 'h' → 7
-    row = int(pos[1]) - 1  # '1' → 0, '8' → 7
+    col = ord(pos[0]) - ord("a")  # 'a' -> 0, 'h' -> 7
+    row = int(pos[1]) - 1  # '1' -> 0, '8' -> 7
     return (col, row)
 
 
@@ -92,7 +131,12 @@ def algebraic_to_tuple(pos: str) -> tuple[int, int]:
 
 @app.route("/")
 def index():
-    """Renders the main page."""
+    """Renders the main page.
+
+    If a game is not active, it displays the starting page where users can
+    set up a new game. If a game is already active, it redirects the user to the
+    `/play` route to continue their game.
+    """
     if game.game_status != "active":
         return render_template("starting_page.html")
     else:
@@ -101,7 +145,11 @@ def index():
 
 @app.route("/play")
 def play():
-    """Renders the game board page."""
+    """Renders the game board page.
+
+    If a game is active, it displays the main `chess.html` template.
+    If no game has been started, it redirects back to the index page.
+    """
     if game.game_status == "not_started":
         return redirect(url_for("index"))
     return render_template("chess.html")
@@ -109,24 +157,63 @@ def play():
 
 @app.route("/start", methods=["POST"])
 def start_game():
-    """Starts a new game, requires player names."""
+    """Starts a new game.
+
+    Initializes a new global `game` object based on the provided settings.
+    This endpoint expects a JSON payload with player names and game mode.
+
+    JSON Payload:
+        {
+            "player_white": "Player1",
+            "player_black": "Player2",
+            "game_mode": "player_vs_player" | "player_vs_ai",
+            "difficulty": "easy" | "medium" | "hard" (optional, required for AI mode)
+        }
+
+    Returns:
+        JSON: A success message and the initial game state, or an error message.
+              (200 OK, 400 Bad Request)
+    """
     global game
     data = request.get_json()
-    if not data or "player_white" not in data or "player_black" not in data:
-        return jsonify({"error": "Player names 'player_white' and 'player_black' must be provided."}), 400
+    if not data or "game_mode" not in data:
+        return jsonify({"error": "Game mode must be provided."}), 400
 
-    difficulty_str = data.get("difficulty", "medium")
-    try:
-        difficulty = Difficulty(difficulty_str.lower())
-    except ValueError:
-        return jsonify({"error": "Invalid difficulty. Choose from 'easy', 'medium', or 'hard'."}), 400
+    game_mode = data.get("game_mode")
+
+    if game_mode == "player_vs_ai":
+        if "player_white" not in data:
+            return jsonify({"error": "Player name 'player_white' must be provided for player vs AI mode."}), 400
+
+        difficulty_str = data.get("difficulty", "medium")
+        try:
+            difficulty = Difficulty(difficulty_str.lower())
+        except ValueError:
+            return jsonify({"error": "Invalid difficulty. Choose from 'easy', 'medium', or 'hard'."}), 400
+
+        white_player = data["player_white"]
+        black_player = f"AI ({difficulty.value.title()})"
+        mode = GameMode.PLAYER_VS_AI
+
+    elif game_mode == "player_vs_player":
+        # Player vs Player mode
+        if "player_white" not in data or "player_black" not in data:
+            return jsonify({"error": "Player names 'player_white' and 'player_black' must be provided."}), 400
+
+        difficulty = None
+        white_player = data["player_white"]
+        black_player = data["player_black"]
+        mode = GameMode.PLAYER_VS_PLAYER
+
+    else:
+        return jsonify({"error": "Invalid game mode. Choose from 'player_vs_player', 'player_vs_ai', or 'ai_vs_ai'."}), 400
 
     game = Game()  # Create a fresh game instance
-    game.start_game(difficulty, data["player_white"], data["player_black"])
+    game.start_game(difficulty, white_player, black_player, mode)
 
     return jsonify(
         {
-            "message": f"New game started for {game.player_white} (White) vs. {game.player_black} (Black).",
+            "message": f"New game started: {game.player_white} (White) vs. {game.player_black} (Black).",
             "state": get_current_state_json(),
         }
     ), 200
@@ -134,14 +221,29 @@ def start_game():
 
 @app.route("/end", methods=["GET"])
 def end_game():
-    """Ends the current game and resets the game object."""
+    """Ends the current game and resets the global game object.
+
+    This allows users to return to the starting screen to begin a new game
+    without restarting the server.
+
+    Returns:
+        JSON: A confirmation message. (200 OK)
+    """
     game.end_game()
     return jsonify({"message": "Game ended successfully. You can start a new game."}), 200
 
 
 @app.route("/state", methods=["GET"])
 def get_state():
-    """Returns the current state of the game."""
+    """Returns the current state of the game.
+
+    This is a public API endpoint for fetching the complete game state, including
+    the board layout, current turn, game status, and player information.
+
+    Returns:
+        JSON: The current game state object, or an error if the game is not
+              started. (200 OK, 404 Not Found)
+    """
     state_data = get_current_state_json()
     if "error" in state_data:
         return jsonify(state_data), 404
@@ -150,7 +252,22 @@ def get_state():
 
 @app.route("/move", methods=["POST"])
 def make_move():
-    """Accepts a move, validates it, and updates the board."""
+    """Accepts a move, validates it, and updates the board.
+
+    This endpoint processes a player's move. It validates the move's legality
+    through the `game.make_move` method. If the move results in a checkmate,
+    it updates the leaderboard.
+
+    JSON Payload:
+        {
+            "from": "e2",
+            "to": "e4"
+        }
+
+    Returns:
+        JSON: A success message and the updated game state, or an error message
+              explaining why the move was invalid. (200 OK, 400 Bad Request)
+    """
     if game.game_status != "active":
         return jsonify({"error": f"Game not active (status: {game.game_status}). Please start a new game."}), 400
 
@@ -180,9 +297,71 @@ def make_move():
         return jsonify({"error": message}), 400
 
 
+@app.route("/ai-move", methods=["POST"])
+def ai_move():
+    """Processes a move made by the AI.
+    This endpoint is called when the AI needs to make a move in a player vs AI game.
+    It checks if the game is active, then calls the `make_ai_move` method on the
+    global `game` object to let the AI make its move.
+    Returns:
+        JSON: A success message with the AI's move and the updated game state,
+              or an error message if the game is not active or the AI cannot move.
+              (200 OK, 400 Bad Request)
+    """
+    if game.game_status != "active":
+        return jsonify({"error": f"Game not active (status: {game.game_status})."}), 400
+
+    success, message = game.make_ai_move()
+
+    if success:
+        # Check if the game ended to update the leaderboard
+        if game.game_status == "checkmate":
+            winner = game.player_white if game.winner == PieceColor.WHITE else game.player_black
+            message = f"Checkmate! {winner} wins."
+
+        response = {"message": message, "state": get_current_state_json()}
+        return jsonify(response), 200
+    else:
+        return jsonify({"error": message}), 400
+
+
+@app.route("/possible-moves", methods=["GET"])
+def get_moves_for_piece():
+    """
+    Returns possible moves for a piece at a given square.
+    This endpoint accepts a square in algebraic notation (e.g., 'e4') and returns
+    a list of possible moves for the piece at that square.
+    Query Parameters:
+        square (str): The algebraic notation of the square (e.g., 'e4').
+    Returns:
+        JSON: A list of possible moves for the piece at the specified square,
+              or an error if the square is invalid or no piece exists there.
+              (200 OK, 400 Bad Request)
+    """
+    square = request.args.get("square")
+    if not square:
+        return jsonify({"error": "A 'square' parameter is required."}), 400
+
+    try:
+        pos_tuple = algebraic_to_tuple(square)
+    except ValueError:
+        return jsonify({"error": "Invalid algebraic notation for square."}), 400
+
+    possible_moves = game.get_possible_moves(pos_tuple)
+    return jsonify({"possible_moves": possible_moves}), 200
+
+
 @app.route("/leaderboard", methods=["GET"])
 def get_leaderboard():
-    """Returns leaderboard data from leaderboard.csv."""
+    """Returns leaderboard data from the CSV file.
+
+    Reads the `leaderboard.csv` file, converts its contents to a list of
+    JSON objects, sorts them by wins in descending order, and returns the list.
+
+    Returns:
+        JSON: A list of player objects, each with 'player_name', 'wins',
+              'losses', and 'draws'. The list is sorted by wins. (200 OK)
+    """
     if not os.path.exists(LEADERBOARD_FILE):
         return jsonify([]), 200  # Return empty list if file doesn't exist
 
@@ -203,7 +382,15 @@ def get_leaderboard():
 
 @app.route("/save", methods=["POST"])
 def save_game_to_file():
-    """Saves the current game state to games.json."""
+    """Saves the current game state to `games.json`.
+
+    Serializes the current in-memory `game` object and writes it to the
+    `GAME_STATE_FILE`.
+
+    Returns:
+        JSON: A success message, or an error if there is no active game
+              to save. (200 OK, 400 Bad Request)
+    """
     if game.game_status == "not_started":
         return jsonify({"error": "No active game to save."}), 400
 
@@ -221,7 +408,16 @@ def save_game_to_file():
 
 @app.route("/load", methods=["GET"])
 def load_game_from_file():
-    """Loads a saved game state from games.json."""
+    """Loads a saved game state from `games.json`.
+
+    Reads the `GAME_STATE_FILE`, reconstructs the `Game` object from the
+    JSON data, and replaces the global `game` instance with the loaded game.
+    This allows play to resume from a previously saved state.
+
+    Returns:
+        JSON: A success message and the loaded game state, or an error if
+              the file doesn't exist. (200 OK, 404 Not Found)
+    """
     global game
     if not os.path.exists(GAME_STATE_FILE):
         return jsonify({"error": f"No saved game file found at {GAME_STATE_FILE}."}), 404
