@@ -112,9 +112,11 @@ class AIPlayer:
         if self.difficulty == Difficulty.EASY:
             return self.get_easy_move(board)
         elif self.difficulty == Difficulty.MEDIUM:
-            return self.minmax(board, 2, float("-inf"), float("inf"), True)
+            score, best_move = self.minmax(board, 2, float("-inf"), float("inf"), True)
+            return best_move
         elif self.difficulty == Difficulty.HARD:
-            return self.minmax(board, 3, float("-inf"), float("inf"), True)
+            score, best_move = self.minmax(board, 3, float("-inf"), float("inf"), True)
+            return best_move
         return None
 
     def get_legal_moves(self, board: Board, color: PieceColor) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:

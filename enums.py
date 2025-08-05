@@ -25,6 +25,10 @@ class PieceColor(Enum):
         """Returns the opposite color."""
         return PieceColor.BLACK if self == PieceColor.WHITE else PieceColor.WHITE
 
+    def __str__(self):
+        """Return the string value of the enum member."""
+        return self.value
+
 
 class Difficulty(Enum):
     """
@@ -40,6 +44,10 @@ class Difficulty(Enum):
     MEDIUM = "medium"
     HARD = "hard"
 
+    def __str__(self):
+        """Return the string value of the enum member."""
+        return self.value
+
 
 class GameMode(Enum):
     """
@@ -52,6 +60,10 @@ class GameMode(Enum):
 
     PLAYER_VS_PLAYER = "player_vs_player"
     PLAYER_VS_AI = "player_vs_ai"
+
+    def __str__(self):
+        """Return the string value of the enum member."""
+        return self.value
 
 
 class GameStatus(Enum):
@@ -71,3 +83,7 @@ class GameStatus(Enum):
     CHECKMATE = "checkmate"
     STALEMATE = "stalemate"
     DRAW = "draw"
+
+    def __str__(self):
+        """Return the string value of the enum member."""
+        return self.value

@@ -9,14 +9,8 @@ The coordinate system used throughout this module is a 0-indexed tuple `(column,
 where `(0, 0)` corresponds to the 'a1' square.
 
 Classes:
-    PieceColor: Enum for piece colors ('white', 'black').
-    Difficulty: Enum for AI difficulty levels.
-    GameMode: Enum for game modes.
     Board: Manages the 8x8 grid, piece placement, and move validation.
-    Piece: Abstract base class for all chess pieces.
-    Pawn, Rook, Knight, Bishop, Queen, King: Concrete piece classes with specific move logic.
     Game: High-level controller for the game state, turns, and player management.
-    AIPlayer: A simple AI to play against, with different difficulty settings.
 """
 
 from __future__ import annotations
