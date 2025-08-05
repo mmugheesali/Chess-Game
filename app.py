@@ -454,3 +454,5 @@ def load_game_from_file():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+# --- END OF FILE app.py ---
