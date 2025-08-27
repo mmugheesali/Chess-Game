@@ -8,295 +8,195 @@ It includes their specific movement logic and attributes.
 
 from __future__ import annotations
 from typing import List, Optional, Tuple
-from enum import Enum
-
-
-class PieceColor(Enum):
-    WHITE = "white"
-    BLACK = "black"
-
-    def __str__(self):
-        return self.value
+from enums import PieceColor
 
 
 class Piece:
     """
-    Base class for all chess pieces.
-
-    This class defines the common attributes and behaviors that all chess pieces share,
-    including position tracking, color, and movement validation. It serves as an abstract
-    base class that specific piece types (Pawn, Knight, Bishop, etc.) will inherit from
-    and extend with their own movement rules.
+    Abstract base class for all chess pieces.
 
     Attributes:
-        color (PieceColor): Color of the piece (white or black)
-        position (str): Position of the piece on the board as a tuple (column, row)
-        symbol (str): Character representation of the piece
+        color (PieceColor): The color of the piece.
+        position (Tuple[int, int]): The (column, row) coordinates of the piece.
+        symbol (str): A single character representing the piece type and color
+                      (e.g., 'P' for white pawn, 'p' for black pawn).
     """
 
-    def __init__(self, color, position, symbol):
+    def __init__(self, color: PieceColor, position: Tuple[int, int], symbol: str):
+        """Initializes a Piece with a color, position, and symbol."""
         self.color = color
         self.position = position
         self.symbol = symbol
 
-    def is_valid_move(self, current_pos, next_pos, board):
-        """Abstract method to check if a move is valid for the piece."""
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        """
+        Generates a list of pseudo-legal moves for this piece.
+
+        "Pseudo-legal" means they follow the piece's move rules but do not
+        account for whether the move would leave the king in check.
+
+        Args:
+            grid (List[List[Optional[Piece]]]): The current board grid.
+
+        Returns:
+            List[Tuple[int, int]]: A list of possible destination coordinates.
+        """
         raise NotImplementedError("Subclasses should implement this method")
 
+    @staticmethod
+    def pos_to_algebraic(pos: Tuple[int, int]) -> str:
+        """Converts a 0-indexed (col, row) tuple to an algebraic notation string."""
+        col, row = pos
+        return f"{chr(col + ord('a'))}{row + 1}"
+
     def get_position(self) -> Tuple[int, int]:
-        """Return the current position of the piece as a tuple (column, row)."""
+        """Returns the current (col, row) position of the piece."""
         return self.position
 
     def get_algebraic_position(self) -> str:
-        """Return the current position of the piece in algebraic notation (e.g., 'e4')."""
-        return str(chr((self.position[0] + 1) + 96)) + str(self.position[1] + 1)
+        """Returns the current position in algebraic notation (e.g., 'e4')."""
+        return self.pos_to_algebraic(self.position)
 
     def set_position(self, newPos: Tuple[int, int]):
-        """Set the position of the piece to a new position."""
+        """Updates the piece's position."""
         self.position = newPos
 
     def get_color(self) -> PieceColor:
-        """Return the color of the piece ('white' or 'black')."""
+        """Returns the color of the piece."""
         return self.color
 
     def get_symbol(self) -> str:
-        """Return the symbol of the piece (e.g., 'P' for Pawn, 'R' for Rook)."""
+        """Returns the character symbol of the piece."""
         return self.symbol
 
 
 class Pawn(Piece):
-    """
-    Class representing a Pawn chess piece.
-
-    Pawns move forward one square, with the option to move two squares on their first move.
-    They capture diagonally forward one square. White pawns move up the board, while
-    black pawns move down.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a Pawn, which moves forward and captures diagonally."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "P" if color == PieceColor.WHITE else "p")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        """Check if the pawn's move is valid based on its current position and the next position."""
-        current_x, current_y = current_pos
-        new_x, new_y = next_pos
-        movement: int = new_y - current_y
-        if current_x == new_x and not grid[new_x][new_y]:  # vertical movement with no piece in the new position
-            if super().get_color() == PieceColor.WHITE:
-                if current_y == 1:  # checks if it's the first move as the pawns can move two squares in first move
-                    if movement > 0 and movement < 3:
-                        return True
-                elif movement == 1:  # regular forward movement (one square only)
-                    return True
-            else:
-                if current_y == 6:  # checks if it's the first move as the pawns can move two squares in first move
-                    if movement > -3 and movement < 0:
-                        return True
-                elif movement == -1:  # regular forward movement (one square only)
-                    return True
-        else:  # diagonal capture logic
-            x_movement: int = new_x - current_x
-            new_piece: Optional[Piece] = grid[new_x][new_y]
-            if (x_movement == -1 or x_movement == 1) and new_piece is not None:  # Checks if there is a piece in diagonal
-                if super().get_color() == PieceColor.WHITE:
-                    if movement == 1 and new_piece.get_color() == PieceColor.BLACK:
-                        return True
-                elif super().get_color() == PieceColor.BLACK:
-                    if movement == -1 and new_piece.get_color() == PieceColor.WHITE:
-                        return True
-        return False
+    def get_moves(self, grid: List[List[Optional[Piece]]]) -> List[Tuple[int, int]]:
+        moves = []
+        x, y = self.position
+        direction = 1 if self.color == PieceColor.WHITE else -1
+        start_row = 1 if self.color == PieceColor.WHITE else 6
+        if 0 <= y + direction <= 7 and not grid[x][y + direction]:
+            moves.append((x, y + direction))
+            # 2-square forward (only if 1-square is also possible)
+            if y == start_row and not grid[x][y + 2 * direction]:
+                moves.append((x, y + 2 * direction))
+        # Captures
+        for dx in [-1, 1]:
+            if 0 <= x + dx <= 7 and 0 <= y + direction <= 7:
+                target = grid[x + dx][y + direction]
+                if target and target.get_color() != self.color:
+                    moves.append((x + dx, y + direction))
+        return moves
 
 
 class Rook(Piece):
-    """
-    Class representing a Rook chess piece.
-
-    Rooks move horizontally or vertically any number of squares, but cannot
-    jump over other pieces.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a Rook, which moves horizontally or vertically."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "R" if color == PieceColor.WHITE else "r")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        """Check if the rook's move is valid based on its current position and the next position."""
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        y_movement: int = next_y - current_y
-        x_movement: int = next_x - current_x
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-
-        if x_movement == 0 and y_movement != 0:  # Check vertical movement (same x, different y)
-            start_y: int = min(current_y, next_y) + 1
-            end_y: int = max(current_y, next_y)
-
-            # Check for pieces in the path (excluding start and end positions)
-            for i in range(start_y, end_y):
-                if grid[current_x][i]:
-                    return False
-            return True
-
-        elif x_movement != 0 and y_movement == 0:  # Check horizontal movement (different x, same y)
-            start_x: int = min(current_x, next_x) + 1
-            end_x: int = max(current_x, next_x)
-
-            # Check for pieces in the path (excluding start and end positions)
-            for i in range(start_x, end_x):
-                if grid[i][current_y]:
-                    return False
-            return True
-
-        return False  # Not a valid rook move (must be either horizontal or vertical)
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        moves = []
+        x, y = self.position
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        for dx, dy in directions:
+            for i in range(1, 8):
+                nx, ny = x + i * dx, y + i * dy
+                if not (0 <= nx <= 7 and 0 <= ny <= 7):
+                    break
+                target = grid[nx][ny]
+                if target:
+                    if target.get_color() != self.color:
+                        moves.append((nx, ny))
+                    break
+                moves.append((nx, ny))
+        return moves
 
 
 class Knight(Piece):
-    """
-    Class representing a Knight chess piece.
-
-    Knights move in an L-shape: two squares horizontally then one square vertically,
-    or two squares vertically then one square horizontally. Knights can jump over
-    other pieces.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a Knight, which moves in an 'L' shape and can jump over pieces."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "N" if color == PieceColor.WHITE else "n")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        """Check if the knight's move is valid based on its current position and the next position."""
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-        if x_movement != 0 and y_movement != 0:  # non-orthogonal movement
-            if y_movement > -3 and y_movement < 3 and x_movement > -3 and x_movement < 3:  # check if within L-shape range
-                if (y_movement == 2 or y_movement == -2) and (
-                    x_movement == 1 or x_movement == -1
-                ):  # L-shape: 2 vertical, 1 horizontal
-                    return True
-                if (y_movement == 1 or y_movement == -1) and (
-                    x_movement == 2 or x_movement == -2
-                ):  # L-shape: 1 vertical, 2 horizontal
-                    return True
-        return False
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        moves = []
+        x, y = self.position
+        potential_moves = [
+            (x + 1, y + 2),
+            (x - 1, y + 2),
+            (x + 1, y - 2),
+            (x - 1, y - 2),
+            (x + 2, y + 1),
+            (x - 2, y + 1),
+            (x + 2, y - 1),
+            (x - 2, y - 1),
+        ]
+        for nx, ny in potential_moves:
+            if 0 <= nx <= 7 and 0 <= ny <= 7:
+                target = grid[nx][ny]
+                if not target or target.get_color() != self.color:
+                    moves.append((nx, ny))
+        return moves
 
 
 class Bishop(Piece):
-    """
-    Class representing a Bishop chess piece.
-
-    Bishops move diagonally any number of squares, but cannot jump over other pieces.
-    They always remain on squares of the same color.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a Bishop, which moves diagonally."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "B" if color == PieceColor.WHITE else "b")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-        if abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
-            dx = 1 if x_movement > 0 else -1
-            dy = 1 if y_movement > 0 else -1
-            x, y = current_x + dx, current_y + dy
-            while x != next_x:
-                if grid[x][y]:
-                    return False
-                x += dx
-                y += dy
-            return True
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        moves = []
+        x, y = self.position
+        directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+        for dx, dy in directions:
+            for i in range(1, 8):
+                nx, ny = x + i * dx, y + i * dy
+                if not (0 <= nx <= 7 and 0 <= ny <= 7):
+                    break
+                target = grid[nx][ny]
+                if target:
+                    if target.get_color() != self.color:
+                        moves.append((nx, ny))
+                    break
+                moves.append((nx, ny))
+        return moves
 
 
 class Queen(Piece):
-    """
-    Class representing a Queen chess piece.
-
-    Queens combine the movement powers of a Rook and Bishop. They can move any number
-    of squares horizontally, vertically, or diagonally, but cannot jump over other pieces.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a Queen, which combines the moves of a Rook and a Bishop."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "Q" if color == PieceColor.WHITE else "q")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-        if x_movement == 0 and y_movement != 0:  # vertical movement (like a rook)
-            start_y: int = min(current_y, next_y) + 1
-            end_y: int = max(current_y, next_y)
-            for i in range(start_y, end_y):  # check path for obstacles
-                if grid[current_x][i]:
-                    return False
-            return True
-        elif x_movement != 0 and y_movement == 0:  # horizontal movement (like a rook)
-            start_x: int = min(current_x, next_x) + 1
-            end_x: int = max(current_x, next_x)
-            for i in range(start_x, end_x):  # check path for obstacles
-                if grid[i][current_y]:
-                    return False
-            return True
-        elif abs(x_movement) == abs(y_movement) and x_movement != 0:  # diagonal movement (like a bishop)
-            dx = 1 if x_movement > 0 else -1
-            dy = 1 if y_movement > 0 else -1
-            x, y = current_x + dx, current_y + dy
-            while x != next_x and y != next_y:
-                if grid[x][y]:
-                    return False
-                x += dx
-                y += dy
-            return True
-        return False
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        # A Queen's moves are the combination of a Rook's and a Bishop's moves.
+        return Rook.get_moves(self, grid) + Bishop.get_moves(self, grid)
 
 
 class King(Piece):
-    """
-    Class representing a King chess piece.
-
-    Kings can move one square in any direction (horizontally, vertically, or diagonally).
-    The king is the most important piece that must be protected from checkmate.
-
-    Attributes:
-        Inherits all attributes from Piece class
-    """
+    """Represents a King, which moves one square in any direction."""
 
     def __init__(self, color, position):
         super().__init__(color, position, "K" if color == PieceColor.WHITE else "k")
 
-    def is_valid_move(self, current_pos: Tuple[int, int], next_pos: Tuple[int, int], grid: List[List[Optional[Piece]]]) -> bool:
-        """Check if the king's move is valid based on its current position and the next position."""
-        current_x, current_y = current_pos
-        next_x, next_y = next_pos
-        x_movement: int = next_x - current_x
-        y_movement: int = next_y - current_y
-        if grid[next_x][next_y] and grid[next_x][next_y].get_color() == super().get_color():
-            return False  # cannot capture own piece
-        if x_movement != 0 or y_movement != 0:  # ensure some movement is happening
-            if (
-                x_movement > -2 and x_movement < 2 and y_movement > -2 and y_movement < 2
-            ):  # check movement is at most one square in any direction
-                return True
+    def get_moves(self, grid: List[List[Optional["Piece"]]]) -> List[Tuple[int, int]]:
+        moves = []
+        x, y = self.position
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx <= 7 and 0 <= ny <= 7:
+                    target = grid[nx][ny]
+                    if not target or target.get_color() != self.color:
+                        moves.append((nx, ny))
+        return moves

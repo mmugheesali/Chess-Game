@@ -1,0 +1,104 @@
+=================================================
+  AI Player Design Documentation for ai.py
+=================================================
+
+1. OVERVIEW
+-------------------------------------------------
+The ai.py module provides the logic for a computer-controlled chess opponent. The core of the AI is the AIPlayer class, which is designed to be flexible and adjustable through different difficulty levels.
+
+The AI's strategy is based on two fundamental components of game-playing AI:
+
+1. A Search Algorithm: To explore possible future moves and their consequences.
+2. An Evaluation Function: To assign a numerical score to any given board position, determining how favorable it is for the AI.
+
+The AI uses the Minimax algorithm with Alpha-Beta Pruning for its search and a custom evaluation function that considers material balance, piece positioning, and game state.
+
+
+2. CORE COMPONENTS
+-------------------------------------------------
+
+2.1. The AIPlayer Class
+
+This class encapsulates all the logic for the AI. It is initialized with two key parameters:
+
+- difficulty (Difficulty): An enum that can be EASY, MEDIUM, or HARD. This setting directly controls the AI's decision-making process.
+- color (PieceColor): The color (WHITE or BLACK) that the AI is playing. The evaluation function is always calculated from the perspective of this color.
+
+2.2. Difficulty Levels
+
+The get_best_move method acts as a controller that selects a strategy based on the AI's difficulty level.
+
+- Difficulty.EASY: This level uses a simple, non-recursive "greedy" algorithm. It does not look ahead. Its logic is:
+    1. Find all legal moves.
+    2. Check if any of these moves result in a capture.
+    3. If there are captures, execute the one that captures the most valuable piece (e.g., capturing a Queen is preferred over capturing a Pawn).
+    4. If there are no possible captures, it makes a completely random legal move.
+  This makes the AI opportunistic but shortsighted and prone to simple blunders.
+
+- Difficulty.MEDIUM & Difficulty.HARD: These levels use the powerful Minimax search algorithm. The only difference between them is the search depth:
+    - Medium: Searches 2 moves deep (one AI move and one opponent response).
+    - Hard: Searches 3 moves deep (AI -> Opponent -> AI).
+  A deeper search allows the AI to anticipate future threats and opportunities more effectively, resulting in significantly stronger play.
+
+
+3. THE MINIMAX SEARCH ALGORITHM
+-------------------------------------------------
+
+The heart of the Medium and Hard AI is the minmax method.
+
+3.1. Core Concept
+
+Minimax explores a "tree" of possible game states. The AI (the "maximizer") assumes it will always choose the move that leads to the highest possible score from the evaluation function. It also assumes the opponent (the "minimizer") will always choose the move that leads to the *lowest* possible score for the AI. By searching several moves deep, the AI can find the move that guarantees the best possible outcome even against a perfect opponent.
+
+3.2. Alpha-Beta Pruning
+
+A full Minimax search is computationally expensive. Alpha-Beta Pruning is a critical optimization that dramatically speeds up the search. It works by "pruning" (ignoring) entire branches of the game tree that it knows cannot possibly influence the final decision.
+
+For example, if the maximizer (AI) has already found a sequence of moves that guarantees a score of +50, and it starts exploring a new branch where the minimizer (opponent) can force a situation with a score of +20, the AI doesn't need to explore that branch any further. It knows it's worse than the option it already has.
+
+3.3. Implementation and Optimizations
+
+The minmax implementation includes several key features:
+
+- Recursion: The function calls itself, alternating between the maximizing and minimizing player until the desired search depth is reached.
+- Terminal Node Evaluation: If a search path leads to checkmate or stalemate before the maximum depth is reached, it returns an appropriate score (infinite for checkmate, zero for stalemate).
+- Move/Unmove Pattern: Instead of creating a new Board object for every possible move (which is slow), the AI makes a move on the existing board, recursively evaluates it, and then reverts the move to restore the board to its original state. This is highly efficient.
+- Move Ordering: This is a crucial optimization for Alpha-Beta Pruning. The algorithm works best if it evaluates the best moves first. The implementation achieves this by pre-sorting the list of legal moves, prioritizing moves that result in a capture of a high-value piece. By checking these "exciting" moves first, the algorithm is much more likely to find a cutoff and prune subsequent, less promising branches.
+
+
+4. THE BOARD EVALUATION FUNCTION
+-------------------------------------------------
+
+The "brain" of the AI is the evaluate_board function. This function takes a board state and returns a single numerical score representing who is winning. A positive score is good for the AI; a negative score is good for the opponent.
+
+The evaluation is a sum of three factors:
+
+4.1. Material Balance
+
+This is the most straightforward component. Each piece is assigned a point value (e.g., Pawn=100, Queen=900). The function sums the values of the AI's pieces and subtracts the sum of the opponent's pieces.
+
+Example Piece Values:
+Pawn: 100
+Knight: 320
+Bishop: 330
+Rook: 500
+Queen: 900
+King: 20000
+
+4.2. Positional Advantage (Piece-Square Tables)
+
+A piece is not only valuable for its material worth but also for its position on the board. A knight in the center of the board is far more powerful than a knight in the corner. This is quantified using Piece-Square Tables (e.g., PAWN_TABLE, KNIGHT_TABLE, etc.).
+
+These tables are 8x8 grids of numbers. Each number represents a positional bonus (or penalty) for placing a specific piece on that square. For example, the pawn table encourages pawns to advance and control the center.
+
+The implementation correctly handles perspective by reading the tables normally for White and flipping the row index for Black.
+
+4.3. Repetition Penalty
+
+To avoid a draw by three-fold repetition, the AI needs to be discouraged from entering a board state that has already occurred. The evaluate_board function implements a simple but effective penalty. It hashes the current board position and checks if it has been seen before in the game's history. If it has, a penalty is subtracted from the evaluation score, making that move less attractive. The penalty increases with each repetition.
+
+
+5. CONCLUSION
+-------------------------------------------------
+
+The AI in ai.py employs a layered strategy. It combines a simple greedy algorithm for the easy difficulty with a sophisticated, optimized search algorithm (Minimax with Alpha-Beta Pruning) for medium and hard difficulties. The strength of the AI is determined by its search depth and the intelligence of its evaluate_board function, which provides a nuanced understanding of a chess position by considering material, piece placement, and game state.
